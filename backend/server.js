@@ -403,4 +403,14 @@ if (require.main === module) {
   app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 }
 
-module.exports = app;
+// Global Error Handler for debugging Serverless environment
+app.use((err, req, res, next) => {
+  console.error("Express Error:", err);
+  res.status(500).json({
+    error: 'Global Error Handler',
+    message: err.message || 'Unknown Error',
+    stack: err.stack
+  });
+});
+
+module.exports = app;
