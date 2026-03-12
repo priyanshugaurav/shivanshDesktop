@@ -381,14 +381,21 @@ app.put('/api/stocks/:id', verifyToken, async (req, res) => {
     }
   });
 
-// --- Serve React frontend (production) ---
+// --- Serve React frontend (production/local fallback) ---
 const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));
 
 // Catch-all: serve index.html for all non-API routes (React Router support)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(frontendPath, 'index.html'));
+// Fixed for Express 5: using app.use instead of app.get('*') to avoid PathError
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'), err => {
+    if (err) res.status(404).send('Frontend not built or missing.');
+  });
 });
+
 
 // Start server only when run directly (not as a serverless function)
 if (require.main === module) {
