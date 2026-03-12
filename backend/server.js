@@ -13,15 +13,26 @@ const app = express();
 // --- CORS: allow env-configured origin (or any in dev) ---
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
 app.use(cors({
-  origin: allowedOrigin || true, // 'true' mirrors request origin (safe for dev)
+  origin: allowedOrigin || true,
   credentials: true,
 }));
 app.use(express.json());
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.log('❌ MongoDB Error:', err));
+// --- Serverless-safe MongoDB connection (cached) ---
+let cachedConnection = null;
+const connectDB = async () => {
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    return cachedConnection;
+  }
+  // Trim to remove any trailing whitespace/newlines from env var
+  const uri = (process.env.MONGO_URI || '').trim();
+  cachedConnection = await mongoose.connect(uri);
+  console.log('✅ MongoDB connected');
+  return cachedConnection;
+};
+connectDB().catch(err => console.error('❌ MongoDB Error:', err));
+
+
 
 // ==========================================
 //  SCHEMAS
