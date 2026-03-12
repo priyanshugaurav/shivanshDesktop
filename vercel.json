@@ -22,8 +22,12 @@
       "dest": "backend/server.js"
     },
     {
-      "src": "/(.*)",
+      "src": "/(assets/.*|vite\\.svg|.*\\.(png|jpg|jpeg|gif|ico|css|js))",
       "dest": "frontend/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/index.html"
     }
   ]
 }
