@@ -4,11 +4,21 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('./models/User');
 const path = require('path');
 
 dotenv.config();
+
+// --- Inline User Model (avoids relative path issues in serverless) ---
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['user', 'admin'], default: 'user' }
+});
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
 const app = express();
+
 
 // --- CORS: allow env-configured origin (or any in dev) ---
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
