@@ -73,7 +73,7 @@ const CustomerSchema = new mongoose.Schema({
   },
   createdAt: { type: Date, default: Date.now }
 });
-const Customer = mongoose.model('Customer', CustomerSchema);
+const Customer = mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
 
 // 2. Challan Schema
 const ChallanSchema = new mongoose.Schema({
@@ -105,7 +105,7 @@ const ChallanSchema = new mongoose.Schema({
   checklist: [String], 
   createdAt: { type: Date, default: Date.now }
 });
-const Challan = mongoose.model('Challan', ChallanSchema);
+const Challan = mongoose.models.Challan || mongoose.model('Challan', ChallanSchema);
 
 // 3. NEW INVENTORY SCHEMAS (Two-Tier)
 
@@ -115,7 +115,7 @@ const VehicleModelSchema = new mongoose.Schema({
   type: { type: String, default: 'E-Rickshaw' },
   createdAt: { type: Date, default: Date.now }
 });
-const VehicleModel = mongoose.model('VehicleModel', VehicleModelSchema);
+const VehicleModel = mongoose.models.VehicleModel || mongoose.model('VehicleModel', VehicleModelSchema);
 
 // Tier 2: Vehicle Stock (Individual Physical Units)
 const VehicleStockSchema = new mongoose.Schema({
@@ -139,7 +139,7 @@ const VehicleStockSchema = new mongoose.Schema({
   status: { type: String, enum: ['Available', 'Sold', 'Booked'], default: 'Available' },
   createdAt: { type: Date, default: Date.now }
 });
-const VehicleStock = mongoose.model('VehicleStock', VehicleStockSchema);
+const VehicleStock = mongoose.models.VehicleStock || mongoose.model('VehicleStock', VehicleStockSchema);
 
 
 // ==========================================
