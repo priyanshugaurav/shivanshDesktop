@@ -21,9 +21,10 @@ const app = express();
 
 
 // --- CORS: allow env-configured origin (or any in dev) ---
-const allowedOrigin = process.env.ALLOWED_ORIGIN;
+const allowedOrigin = process.env.ALLOWED_ORIGIN ? process.env.ALLOWED_ORIGIN.trim() : true;
 app.use(cors({
-  origin: allowedOrigin || true,
+  origin: allowedOrigin,
+
   credentials: true,
 }));
 app.use(express.json());
