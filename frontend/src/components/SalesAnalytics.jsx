@@ -314,10 +314,16 @@ const SalesAnalytics = ({ theme: t }) => {
                                 </defs>
                                 <CartesianGrid stroke="#f1f5f9" vertical={false} strokeDasharray="3 3" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                <YAxis 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tick={{ fill: '#94a3b8', fontSize: 10 }} 
+                                    tickFormatter={(val) => val >= 100000 ? `${(val/100000).toFixed(1)}L` : val >= 1000 ? `${(val/1000).toFixed(0)}k` : val}
+                                />
                                 <Tooltip 
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontFamily: 'sans-serif' }} 
                                     cursor={{ fill: '#f8fafc' }} 
+                                    formatter={(val) => [`₹ ${new Intl.NumberFormat('en-IN').format(val)}`, '']}
                                 />
                                 <Area type="monotone" dataKey="profit" fill="url(#colorProfit)" stroke={THEME_COLOR} strokeWidth={3} />
                                 <Bar dataKey="revenue" barSize={16} fill="currentColor" className={t.text} radius={[4, 4, 0, 0]} />
@@ -424,11 +430,16 @@ const SalesAnalytics = ({ theme: t }) => {
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{borderRadius:'8px', fontSize:'10px', border:'none'}}/>
+                                <Tooltip 
+                                    contentStyle={{borderRadius:'8px', fontSize:'10px', border:'none'}}
+                                    formatter={(val) => [`${val} Units`, 'Value']}
+                                />
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                            <span className="block text-2xl font-black text-slate-800">450</span>
+                            <span className="block text-2xl font-black text-slate-800">
+                                {modelDistribution.reduce((acc, curr) => acc + curr.value, 0)}
+                            </span>
                             <span className="block text-[8px] font-bold uppercase text-slate-400 tracking-wider">Units Sold</span>
                         </div>
                     </div>

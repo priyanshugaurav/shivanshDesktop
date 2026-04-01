@@ -590,14 +590,18 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     const monthlyMap = {};
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     
+    const formatter = new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 0
+    });
+
     agreements.forEach(agg => {
       const date = new Date(agg.createdAt);
       const monthLabel = months[date.getMonth()];
       if (!monthlyMap[monthLabel]) {
         monthlyMap[monthLabel] = { name: monthLabel, revenue: 0, expenses: 0, profit: 0 };
       }
-      monthlyMap[monthLabel].revenue += (parseFloat(agg.model.onRoadPrice) || 0) / 100000; // In Lakhs for chart scaling
-      monthlyMap[monthLabel].profit += (parseFloat(agg.dse.finalNetProfit) || 0) / 100000;
+      monthlyMap[monthLabel].revenue += (parseFloat(agg.model.onRoadPrice) || 0); 
+      monthlyMap[monthLabel].profit += (parseFloat(agg.dse.finalNetProfit) || 0);
     });
 
     const financialMixedData = Object.values(monthlyMap);
@@ -617,10 +621,10 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     // Recent Sales Log
     const recentSales = agreements.slice(-5).reverse().map(agg => ({
         id: agg.agreementId || agg._id.toString().slice(-6),
-        customer: 'Customer', // Would need populate if we had name here, otherwise placeholder
+        customer: 'Customer',
         model: agg.model.name,
         date: new Date(agg.createdAt).toLocaleDateString(),
-        amount: `₹ ${(parseFloat(agg.model.onRoadPrice)/100000).toFixed(2)} L`,
+        amount: `₹ ${formatter.format(parseFloat(agg.model.onRoadPrice) || 0)}`,
         status: parseFloat(agg.payment.netDues) <= 0 ? 'Paid' : 'Pending'
     }));
 
@@ -634,7 +638,7 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     });
     const dsePerformance = Object.values(dseMap).map(d => ({
         ...d,
-        revenue: `₹ ${(d.revenue/100000).toFixed(2)} L`
+        revenue: `₹ ${formatter.format(d.revenue || 0)}`
     }));
 
     // Recent Activity Feed
@@ -646,11 +650,11 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
 
     res.json({
       kpis: [
-        { id: 'net_profit', label: 'Net Profit', value: `₹ ${(stats.netProfit/100000).toFixed(2)} L`, raw: stats.netProfit },
-        { id: 'gross_rev', label: 'Gross Revenue', value: `₹ ${(stats.grossRevenue/10000000).toFixed(2)} Cr`, raw: stats.grossRevenue },
-        { id: 'dse_comm', label: 'DSE Payouts', value: '₹ 0 L', raw: 0 }, 
-        { id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${(stats.tds/100000).toFixed(2)} L`, raw: stats.tds },
-        { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${(stats.pendingDues/100000).toFixed(2)} L`, raw: stats.pendingDues }
+        { id: 'net_profit', label: 'Net Profit', value: `₹ ${formatter.format(stats.netProfit)}`, raw: stats.netProfit },
+        { id: 'gross_rev', label: 'Gross Revenue', value: `₹ ${formatter.format(stats.grossRevenue)}`, raw: stats.grossRevenue },
+        { id: 'dse_comm', label: 'DSE Payouts', value: '₹ 0', raw: 0 }, 
+        { id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${formatter.format(stats.tds)}`, raw: stats.tds },
+        { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${formatter.format(stats.pendingDues)}`, raw: stats.pendingDues }
       ],
       financialMixedData,
       modelDistribution,
