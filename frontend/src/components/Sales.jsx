@@ -598,6 +598,18 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             handleDeepChange('model', 'onRoadPrice', total);
         }
     }, [formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit]);
+    
+    // Auto-calculate DTO Total
+    useEffect(() => {
+        const permit = parseFloat(formData.dto.permit) || 0;
+        const reg = parseFloat(formData.dto.registration) || 0;
+        const online = parseFloat(formData.dto.onlinePayment) || 0;
+        const total = (permit + reg + online).toFixed(2);
+        
+        if (formData.dto.total !== total) {
+            handleDeepChange('dto', 'total', total);
+        }
+    }, [formData.dto.permit, formData.dto.registration, formData.dto.onlinePayment]);
 
     // Handle Model Selection Sync
     const onModelSelect = (modelName) => {
@@ -725,7 +737,12 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <Input label="DTO Permit" value={formData.dto.permit} onChange={v => handleDeepChange('dto', 'permit', v)} theme={theme} />
-                                <Input label="DTO Total" value={formData.dto.total} onChange={v => handleDeepChange('dto', 'total', v)} theme={theme} />
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Total (Auto)</label>
+                                    <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">
+                                        {formData.dto.total}
+                                    </div>
+                                </div>
                             </div>
                             <Input label="DTO Online Payment" value={formData.dto.onlinePayment} onChange={v => handleDeepChange('dto', 'onlinePayment', v)} theme={theme} />
                         </div>
