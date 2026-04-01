@@ -382,6 +382,31 @@ app.put('/api/stocks/:id', verifyToken, async (req, res) => {
     }
   });
 
+
+// 7. Aggregate Inventory (For Sales/Challan Dropdowns)
+app.get('/api/inventory', verifyToken, async (req, res) => {
+  try {
+    const models = await VehicleModel.find().sort({ name: 1 });
+    const inventory = await Promise.all(models.map(async (model) => {
+      const stocks = await VehicleStock.find({ 
+        modelId: model._id, 
+        status: 'Available' 
+      });
+      // Extract unique colors from stock units
+      const uniqueColors = [...new Set(stocks.map(s => s.color).filter(c => c))];
+      
+      return {
+        _id: model._id,
+        modelName: model.name, // Maps to 'modelName' context in Sales.jsx
+        colors: uniqueColors
+      };
+    }));
+    res.json(inventory);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Serve React frontend (production/local fallback) ---
 const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));

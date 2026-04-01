@@ -3,8 +3,9 @@ import {
     Search, RefreshCw, Filter, Phone, MapPin, 
     Calendar, CheckCircle, X, Loader2, ChevronRight,
     User, SlidersHorizontal, Clock, ArrowUpRight, 
-    Briefcase, Car, Hash, IndianRupee, Map
+    Briefcase, Car, Hash, IndianRupee, Map, Download
 } from 'lucide-react';
+import { utils, writeFile } from 'xlsx';
 import { useEnquiries } from '../hooks/useEnquiries';
 
 // --- UTILS ---
@@ -35,7 +36,7 @@ const Enquiry = ({ theme }) => {
     const [selectedEnquiry, setSelectedEnquiry] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
     const [isClosing, setIsClosing] = useState(null);
-    const [filters, setFilters] = useState({ salesman: 'All', village: 'All', period: 'All' });
+    const [filters, setFilters] = useState({ salesman: 'All', village: 'All', period: 'All', nature: 'All' });
 
     // --- FILTER LOGIC ---
     const uniqueSalesmen = useMemo(() => ['All', ...new Set(data.map(d => d.Salesman).filter(Boolean))], [data]);
@@ -51,6 +52,7 @@ const Enquiry = ({ theme }) => {
             if (!searchMatch) return false;
             if (filters.salesman !== 'All' && row.Salesman !== filters.salesman) return false;
             if (filters.village !== 'All' && row.Village !== filters.village) return false;
+            if (filters.nature !== 'All' && row['Model Nature'] !== filters.nature) return false;
             
             if (filters.period !== 'All') {
                 const diffDays = Math.ceil(Math.abs(new Date() - new Date(row['Date Recorded'])) / (1000 * 60 * 60 * 24));
@@ -68,6 +70,13 @@ const Enquiry = ({ theme }) => {
         setIsClosing(null);
         if (res.success) setSelectedEnquiry(null);
         else alert(res.message);
+    };
+
+    const handleDownloadExcel = () => {
+        const worksheet = utils.json_to_sheet(filteredData);
+        const workbook = utils.book_new();
+        utils.book_append_sheet(workbook, worksheet, "Enquiries");
+        writeFile(workbook, `Enquiries_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     return (
@@ -99,6 +108,13 @@ const Enquiry = ({ theme }) => {
                         >
                             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                         </button>
+                        <button 
+                            onClick={handleDownloadExcel}
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm active:scale-95"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Export
+                        </button>
                     </div>
                 </div>
 
@@ -112,17 +128,18 @@ const Enquiry = ({ theme }) => {
                                 className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-slate-400 transition-all shadow-sm"
                             />
                         </div>
-                        {['salesman', 'village', 'period'].map(key => (
+                        {['salesman', 'village', 'period', 'nature'].map(key => (
                             <select 
                                 key={key}
                                 className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none focus:border-slate-400 cursor-pointer capitalize shadow-sm"
                                 value={filters[key]}
                                 onChange={e => setFilters({...filters, [key]: e.target.value})}
                             >
-                                <option value="All">All {key}s</option>
+                                <option value="All">All {key === 'nature' ? 'Natures' : key + 's'}</option>
                                 {key === 'salesman' && uniqueSalesmen.filter(s => s!=='All').map(s => <option key={s} value={s}>{s}</option>)}
                                 {key === 'village' && uniqueVillages.filter(v => v!=='All').map(v => <option key={v} value={v}>{v}</option>)}
                                 {key === 'period' && <><option value="7days">Last 7 Days</option><option value="30days">Last 30 Days</option></>}
+                                {key === 'nature' && <><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></>}
                             </select>
                         ))}
                     </div>
