@@ -108,7 +108,64 @@ const ChallanSchema = new mongoose.Schema({
 });
 const Challan = mongoose.models.Challan || mongoose.model('Challan', ChallanSchema);
 
-// 3. NEW INVENTORY SCHEMAS (Two-Tier)
+// 3. Agreement Schema
+const AgreementSchema = new mongoose.Schema({
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  agreementId: String,
+  model: {
+    name: String,
+    exShowroom: String,
+    insurance: String,
+    rto: String,
+    permit: String,
+    onRoadPrice: String
+  },
+  loan: {
+    bankName: String,
+    amount: String,
+    processingFee: String
+  },
+  dto: {
+    place: String,
+    registration: String,
+    onlinePayment: String,
+    permit: String,
+    total: String
+  },
+  broker: {
+    name: String,
+    phone: String,
+    village: String,
+    amount: String
+  },
+  payment: {
+    downPayment: String,
+    paidAmount: String,
+    type: String,
+    date: Date,
+    dues: String,
+    netDues: String
+  },
+  other: {
+    amount: String,
+    remark: String
+  },
+  dse: {
+    name: String,
+    commission: String,
+    netProfit: String,
+    tds: String,
+    finalNetProfit: String
+  },
+  magadh: {
+    margin: String,
+    paymentDate: Date
+  },
+  createdAt: { type: Date, default: Date.now }
+});
+const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', AgreementSchema);
+
+// 4. NEW INVENTORY SCHEMAS (Two-Tier)
 
 // Tier 1: Vehicle Model (Catalog Name)
 const VehicleModelSchema = new mongoose.Schema({
@@ -274,6 +331,41 @@ app.put('/api/challan/:id', verifyToken, async (req, res) => {
       { new: true }
     );
     res.json(updatedChallan);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Agreement Routes ---
+
+app.post('/api/agreement', verifyToken, async (req, res) => {
+  try {
+    const newAgreement = await Agreement.create(req.body);
+    await Customer.findByIdAndUpdate(req.body.customerId, { $set: { 'pipeline.agreement': true } });
+    res.status(201).json(newAgreement);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/agreement/:customerId', verifyToken, async (req, res) => {
+  try {
+    const agreement = await Agreement.findOne({ customerId: req.params.customerId });
+    if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
+    res.json(agreement);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/agreement/:id', verifyToken, async (req, res) => {
+  try {
+    const updatedAgreement = await Agreement.findByIdAndUpdate(
+      req.params.id, 
+      { $set: req.body }, 
+      { new: true }
+    );
+    res.json(updatedAgreement);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -499,6 +499,39 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       dse: { name: '', commission: '', netProfit: '-262790.00', tds: '0.00', finalNetProfit: '-262790.00' },
       magadh: { margin: '262790.00', paymentDate: '' }
     });
+
+    const [stocks, setStocks] = useState([]);
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+
+            try {
+                // 1. Fetch inventory models
+                const invRes = await fetch(`${API_URL}/inventory`, { headers: { 'Authorization': token } });
+                if (invRes.ok) {
+                    const invData = await invRes.json();
+                    setStocks(invData);
+
+                    // 2. If creating new, fetch challan to auto-fill model
+                    if (!initialData && customer?.originalId) {
+                        const challanRes = await fetch(`${API_URL}/challan/${customer.originalId}`, { headers: { 'Authorization': token } });
+                        if (challanRes.ok) {
+                            const challanData = await challanRes.json();
+                            if (challanData.details?.model) {
+                                handleDeepChange('model', 'name', challanData.details.model);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching data for agreement:", error);
+            }
+        };
+
+        fetchData();
+    }, [customer, initialData]);
    
     const handleDeepChange = (section, field, value) => {
       setFormData(prev => ({
@@ -594,7 +627,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                               <Input label="Agreement ID" value={formData.agreementId} onChange={v => handleChange('agreementId', v)} />
                           </div>
                           <div className="md:col-span-3 h-px bg-slate-100 my-1"></div>
-                          <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label><select value={formData.model.name} onChange={e => handleDeepChange('model', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option>RE COMPACT CNG</option><option>MAXIMA Z</option></select></div>
+                          <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label><select value={formData.model.name} onChange={e => handleDeepChange('model', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">Select Model</option>{stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}</select></div>
                           <Input label="Ex-Showroom" value={formData.model.exShowroom} onChange={v => handleDeepChange('model', 'exShowroom', v)} />
                           <Input label="Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} />
                           <Input label="RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} />
