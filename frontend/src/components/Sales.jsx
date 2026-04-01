@@ -482,22 +482,38 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
     );
 };
 
+// --- REUSABLE COMPONENTS (Defined outside to prevent re-mount focus issues) ---
+const Input = ({ label, value, onChange, type="text", prefix, theme }) => (
+    <div>
+        <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">{label}</label>
+        <div className="relative">
+            {prefix && <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">{prefix}</span>}
+            <input 
+                type={type} 
+                value={value} 
+                onChange={e => onChange(e.target.value)} 
+                className={`w-full ${prefix ? 'pl-7' : 'px-3'} py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-transparent focus:ring-1 ${theme?.ring} outline-none transition-all`} 
+            />
+        </div>
+    </div>
+);
+
 // ==========================================
-// 4. COMPONENT: AGREEMENT FORM (Create & Edit)
+// 4. COMPONENT: RENTAL AGREEMENT FORM
 // ==========================================
 const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     const [loading, setLoading] = useState(false);
     
     const [formData, setFormData] = useState(initialData || {
       agreementId: '',
-      model: { name: 'RE COMPACT CNG', exShowroom: '250490', insurance: '12300', rto: '18000', permit: '5500', onRoadPrice: '286290.00' },
+      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', onRoadPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
       dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
       payment: { downPayment: '', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
       other: { amount: '', remark: '' },
-      dse: { name: '', commission: '', netProfit: '-262790.00', tds: '0.00', finalNetProfit: '-262790.00' },
-      magadh: { margin: '262790.00', paymentDate: '' }
+      dse: { name: '', commission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' },
+      magadh: { margin: '0.00', paymentDate: '' }
     });
 
     const [stocks, setStocks] = useState([]);
@@ -520,7 +536,23 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                         if (challanRes.ok) {
                             const challanData = await challanRes.json();
                             if (challanData.details?.model) {
-                                handleDeepChange('model', 'name', challanData.details.model);
+                                const modelName = challanData.details.model;
+                                const selectedModel = invData.find(s => s.modelName === modelName);
+                                if (selectedModel && selectedModel.pricing) {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        model: {
+                                            ...prev.model,
+                                            name: modelName,
+                                            exShowroom: selectedModel.pricing.exShowroom.toString(),
+                                            insurance: selectedModel.pricing.insurance.toString(),
+                                            rto: selectedModel.pricing.rto.toString(),
+                                            permit: selectedModel.pricing.permit.toString()
+                                        }
+                                    }));
+                                } else {
+                                    handleDeepChange('model', 'name', modelName);
+                                }
                             }
                         }
                     }
@@ -543,6 +575,38 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     // Simple state change for root level
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    // Auto-calculate On Road Price
+    useEffect(() => {
+        const ex = parseFloat(formData.model.exShowroom) || 0;
+        const ins = parseFloat(formData.model.insurance) || 0;
+        const rto = parseFloat(formData.model.rto) || 0;
+        const pmt = parseFloat(formData.model.permit) || 0;
+        const total = (ex + ins + rto + pmt).toFixed(2);
+        
+        if (formData.model.onRoadPrice !== total) {
+            handleDeepChange('model', 'onRoadPrice', total);
+        }
+    }, [formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit]);
+
+    // Handle Model Selection Sync
+    const onModelSelect = (modelName) => {
+        handleDeepChange('model', 'name', modelName);
+        const selectedModel = stocks.find(s => s.modelName === modelName);
+        if (selectedModel && selectedModel.pricing) {
+            setFormData(prev => ({
+                ...prev,
+                model: {
+                    ...prev.model,
+                    name: modelName,
+                    exShowroom: selectedModel.pricing.exShowroom.toString(),
+                    insurance: selectedModel.pricing.insurance.toString(),
+                    rto: selectedModel.pricing.rto.toString(),
+                    permit: selectedModel.pricing.permit.toString()
+                }
+            }));
+        }
     };
    
     const handleSubmit = async () => {
@@ -571,25 +635,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       finally { setLoading(false); }
     };
 
-    // Reusable Input Field
-    const Input = ({ label, value, onChange, type="text", prefix }) => (
-        <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">{label}</label>
-            <div className="relative">
-                {prefix && <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">{prefix}</span>}
-                <input 
-                    type={type} 
-                    value={value} 
-                    onChange={e => onChange(e.target.value)} 
-                    className={`w-full ${prefix ? 'pl-7' : 'px-3'} py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all`} 
-                />
-            </div>
-        </div>
-    );
-   
     return (
       <div className="animate-in zoom-in-95 duration-300 flex flex-col pb-8 h-full">
-        {/* Action Bar */}
         <div className="flex items-center justify-between mb-4 shrink-0">
           <div className="flex items-center gap-4">
               <button onClick={onBack} className="group flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors">
@@ -618,33 +665,34 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
    
            <div className="flex-1 bg-slate-50/50 overflow-y-auto">
               <form className="p-6 md:p-8 space-y-8" onSubmit={e => e.preventDefault()}>
-                  
-                  {/* SECTION 1: Agreement & Model */}
                   <div>
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Car className="h-4 w-4 text-slate-400" /> Agreement & Model Details</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="md:col-span-3">
-                              <Input label="Agreement ID" value={formData.agreementId} onChange={v => handleChange('agreementId', v)} />
+                              <Input label="Agreement ID" value={formData.agreementId} onChange={v => handleChange('agreementId', v)} prefix="#" theme={theme} />
+                              {!initialData && <p className="text-[10px] text-slate-400 mt-1 font-bold italic">* Leave blank for auto-generation (Starts from 1001)</p>}
                           </div>
                           <div className="md:col-span-3 h-px bg-slate-100 my-1"></div>
-                          <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label><select value={formData.model.name} onChange={e => handleDeepChange('model', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">Select Model</option>{stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}</select></div>
-                          <Input label="Ex-Showroom" value={formData.model.exShowroom} onChange={v => handleDeepChange('model', 'exShowroom', v)} />
-                          <Input label="Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} />
-                          <Input label="RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} />
-                          <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} />
-                          <Input label="On Road Price" value={formData.model.onRoadPrice} onChange={v => handleDeepChange('model', 'onRoadPrice', v)} />
+                          <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label><select value={formData.model.name} onChange={e => onModelSelect(e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">Select Model</option>{stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}</select></div>
+                          <Input label="Ex-Showroom" value={formData.model.exShowroom} onChange={v => handleDeepChange('model', 'exShowroom', v)} theme={theme} />
+                          <Input label="Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} theme={theme} />
+                          <Input label="RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} theme={theme} />
+                          <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} theme={theme} />
+                          <div className="md:col-span-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">On Road Price (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{formData.model.onRoadPrice}</div>
+                          </div>
                       </div>
                   </div>
 
-                  {/* SECTION 2: Loan & DTO */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Landmark className="h-4 w-4 text-slate-400" /> Loan Details</h3>
                         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm space-y-4">
-                            <Input label="Bank Name" value={formData.loan.bankName} onChange={v => handleDeepChange('loan', 'bankName', v)} />
+                            <Input label="Bank Name" value={formData.loan.bankName} onChange={v => handleDeepChange('loan', 'bankName', v)} theme={theme} />
                             <div className="grid grid-cols-2 gap-4">
-                                <Input label="Loan Amount" value={formData.loan.amount} onChange={v => handleDeepChange('loan', 'amount', v)} />
-                                <Input label="Bank Processing Fee" value={formData.loan.processingFee} onChange={v => handleDeepChange('loan', 'processingFee', v)} />
+                                <Input label="Loan Amount" value={formData.loan.amount} onChange={v => handleDeepChange('loan', 'amount', v)} theme={theme} />
+                                <Input label="Bank Processing Fee" value={formData.loan.processingFee} onChange={v => handleDeepChange('loan', 'processingFee', v)} theme={theme} />
                             </div>
                         </div>
                       </div>
@@ -653,53 +701,50 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Place</label><select value={formData.dto.place} onChange={e => handleDeepChange('dto', 'place', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option>PATNA</option><option>MUZAFFARPUR</option><option>SARAN</option></select></div>
-                                <Input label="DTO Registration" value={formData.dto.registration} onChange={v => handleDeepChange('dto', 'registration', v)} />
+                                <Input label="DTO Registration" value={formData.dto.registration} onChange={v => handleDeepChange('dto', 'registration', v)} theme={theme} />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <Input label="DTO Permit" value={formData.dto.permit} onChange={v => handleDeepChange('dto', 'permit', v)} />
-                                <Input label="DTO Total" value={formData.dto.total} onChange={v => handleDeepChange('dto', 'total', v)} />
+                                <Input label="DTO Permit" value={formData.dto.permit} onChange={v => handleDeepChange('dto', 'permit', v)} theme={theme} />
+                                <Input label="DTO Total" value={formData.dto.total} onChange={v => handleDeepChange('dto', 'total', v)} theme={theme} />
                             </div>
-                            <Input label="DTO Online Payment" value={formData.dto.onlinePayment} onChange={v => handleDeepChange('dto', 'onlinePayment', v)} />
+                            <Input label="DTO Online Payment" value={formData.dto.onlinePayment} onChange={v => handleDeepChange('dto', 'onlinePayment', v)} theme={theme} />
                         </div>
                       </div>
                   </div>
 
-                  {/* SECTION 3: Broker & Other */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><UserCheck className="h-4 w-4 text-slate-400" /> Broker Details</h3>
                         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm space-y-4">
-                            <Input label="Broker Name" value={formData.broker.name} onChange={v => handleDeepChange('broker', 'name', v)} />
+                            <Input label="Broker Name" value={formData.broker.name} onChange={v => handleDeepChange('broker', 'name', v)} theme={theme} />
                             <div className="grid grid-cols-2 gap-4">
-                                <Input label="Broker Phone" value={formData.broker.phone} onChange={v => handleDeepChange('broker', 'phone', v)} />
-                                <Input label="Broker Village" value={formData.broker.village} onChange={v => handleDeepChange('broker', 'village', v)} />
+                                <Input label="Broker Phone" value={formData.broker.phone} onChange={v => handleDeepChange('broker', 'phone', v)} theme={theme} />
+                                <Input label="Broker Village" value={formData.broker.village} onChange={v => handleDeepChange('broker', 'village', v)} theme={theme} />
                             </div>
-                            <Input label="Broker Amount" value={formData.broker.amount} onChange={v => handleDeepChange('broker', 'amount', v)} />
+                            <Input label="Broker Amount" value={formData.broker.amount} onChange={v => handleDeepChange('broker', 'amount', v)} theme={theme} />
                         </div>
                       </div>
                       <div>
                         <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Tag className="h-4 w-4 text-slate-400" /> Other</h3>
                         <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm space-y-4">
-                            <Input label="Other Amount" value={formData.other.amount} onChange={v => handleDeepChange('other', 'amount', v)} />
-                            <Input label="Other Remark" value={formData.other.remark} onChange={v => handleDeepChange('other', 'remark', v)} />
+                            <Input label="Other Amount" value={formData.other.amount} onChange={v => handleDeepChange('other', 'amount', v)} theme={theme} />
+                            <Input label="Other Remark" value={formData.other.remark} onChange={v => handleDeepChange('other', 'remark', v)} theme={theme} />
                         </div>
                       </div>
                   </div>
 
-                  {/* SECTION 4: Payment */}
                   <div>
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Calculator className="h-4 w-4 text-slate-400" /> Payment</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
-                          <Input label="Customer Down Payment" value={formData.payment.downPayment} onChange={v => handleDeepChange('payment', 'downPayment', v)} />
-                          <Input label="Customer Paid Amount" value={formData.payment.paidAmount} onChange={v => handleDeepChange('payment', 'paidAmount', v)} />
+                          <Input label="Customer Down Payment" value={formData.payment.downPayment} onChange={v => handleDeepChange('payment', 'downPayment', v)} theme={theme} />
+                          <Input label="Customer Paid Amount" value={formData.payment.paidAmount} onChange={v => handleDeepChange('payment', 'paidAmount', v)} theme={theme} />
                           <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Payment Type</label><select value={formData.payment.type} onChange={e => handleDeepChange('payment', 'type', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option>CASH</option><option>ONLINE</option><option>CHEQUE</option></select></div>
-                          <Input label="Payment Date" type="date" value={formData.payment.date} onChange={v => handleDeepChange('payment', 'date', v)} />
-                          <Input label="Dues" value={formData.payment.dues} onChange={v => handleDeepChange('payment', 'dues', v)} />
-                          <Input label="Net Dues Remaining" value={formData.payment.netDues} onChange={v => handleDeepChange('payment', 'netDues', v)} />
+                          <Input label="Payment Date" type="date" value={formData.payment.date} onChange={v => handleDeepChange('payment', 'date', v)} theme={theme} />
+                          <Input label="Dues" value={formData.payment.dues} onChange={v => handleDeepChange('payment', 'dues', v)} theme={theme} />
+                          <Input label="Net Dues Remaining" value={formData.payment.netDues} onChange={v => handleDeepChange('payment', 'netDues', v)} theme={theme} />
                       </div>
                   </div>
 
-                  {/* SECTION 5: DSE Details */}
                   <div>
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><User className="h-4 w-4 text-slate-400" /> DSE Details</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -707,23 +752,23 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                             <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DSE</label>
                             <select value={formData.dse.name} onChange={e => handleDeepChange('dse', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">SELECT DSE</option><option value="Ashok Sah">Ashok Sah</option></select>
                           </div>
-                          <Input label="Commission" value={formData.dse.commission} onChange={v => handleDeepChange('dse', 'commission', v)} />
-                          <Input label="Net Profit" value={formData.dse.netProfit} onChange={v => handleDeepChange('dse', 'netProfit', v)} />
+                          <Input label="Commission" value={formData.dse.commission} onChange={v => handleDeepChange('dse', 'commission', v)} theme={theme} />
+                          <Input label="Net Profit" value={formData.dse.netProfit} onChange={v => handleDeepChange('dse', 'netProfit', v)} theme={theme} />
                           <div className="md:row-span-2">
-                             <Input label="Magadh Margin" value={formData.magadh.margin} onChange={v => handleDeepChange('magadh', 'margin', v)} />
+                             <Input label="Magadh Margin" value={formData.magadh.margin} onChange={v => handleDeepChange('magadh', 'margin', v)} theme={theme} />
                           </div>
-                          <Input label="TDS (5%)" value={formData.dse.tds} onChange={v => handleDeepChange('dse', 'tds', v)} />
-                          <Input label="Final Net Profit" value={formData.dse.finalNetProfit} onChange={v => handleDeepChange('dse', 'finalNetProfit', v)} />
-                          <Input label="Magadh Payment Date" type="date" value={formData.magadh.paymentDate} onChange={v => handleDeepChange('magadh', 'paymentDate', v)} />
+                          <Input label="TDS (5%)" value={formData.dse.tds} onChange={v => handleDeepChange('dse', 'tds', v)} theme={theme} />
+                          <Input label="Final Net Profit" value={formData.dse.finalNetProfit} onChange={v => handleDeepChange('dse', 'finalNetProfit', v)} theme={theme} />
+                          <Input label="Magadh Payment Date" type="date" value={formData.magadh.paymentDate} onChange={v => handleDeepChange('magadh', 'paymentDate', v)} theme={theme} />
                       </div>
                   </div>
-
               </form>
            </div>
         </div>
       </div>
     );
   };
+
 
 // ==========================================
 // 5. SUB-COMPONENT: ADD RECORD FORM

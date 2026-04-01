@@ -19,7 +19,7 @@ const TechnicalStockDashboard = ({ theme: t }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     // New Model Input State
-    const [newModelName, setNewModelName] = useState('');
+    const [newModel, setNewModel] = useState({ name: '', exShowroom: '', insurance: '', rto: '', permit: '' });
     const [isAddingModel, setIsAddingModel] = useState(false);
 
     // Filter State
@@ -90,11 +90,10 @@ const TechnicalStockDashboard = ({ theme: t }) => {
     };
 
     const handleAddModel = async () => {
-        if (!newModelName.trim()) return;
+        if (!newModel.name.trim()) return;
         try {
-            // FIXED: Added getAuthHeader() as the third argument
-            await axios.post(`${API_URL}/models`, { name: newModelName }, getAuthHeader());
-            setNewModelName('');
+            await axios.post(`${API_URL}/models`, newModel, getAuthHeader());
+            setNewModel({ name: '', exShowroom: '', insurance: '', rto: '', permit: '' });
             setIsAddingModel(false);
             fetchModels(); 
         } catch (err) { 
@@ -151,17 +150,62 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                     </div>
 
                     {isAddingModel ? (
-                        <div className="flex gap-2">
+                        <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm animate-in slide-in-from-top-2 duration-300">
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="text-[10px] font-black uppercase text-slate-400">New Model</span>
+                                <button onClick={() => setIsAddingModel(false)} className="text-slate-400 hover:text-slate-600"><X size={14}/></button>
+                            </div>
                             <input 
                                 autoFocus
-                                value={newModelName}
-                                onChange={(e) => setNewModelName(e.target.value)}
+                                value={newModel.name}
+                                onChange={(e) => setNewModel({...newModel, name: e.target.value})}
                                 placeholder="Model Name..."
-                                className="w-full text-xs p-2 rounded border border-slate-300 focus:outline-none focus:border-blue-500"
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddModel()}
+                                className="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-slate-50 font-bold"
                             />
-                            <button onClick={handleAddModel} className="bg-green-500 text-white p-2 rounded hover:bg-green-600"><CheckCircle2 size={14}/></button>
-                            <button onClick={() => setIsAddingModel(false)} className="bg-slate-200 text-slate-500 p-2 rounded hover:bg-slate-300"><X size={14}/></button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Ex-Showroom</label>
+                                    <input 
+                                        type="number"
+                                        value={newModel.exShowroom}
+                                        onChange={(e) => setNewModel({...newModel, exShowroom: e.target.value})}
+                                        className="w-full text-[10px] p-2 rounded-lg border border-slate-200 font-bold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Insurance</label>
+                                    <input 
+                                        type="number"
+                                        value={newModel.insurance}
+                                        onChange={(e) => setNewModel({...newModel, insurance: e.target.value})}
+                                        className="w-full text-[10px] p-2 rounded-lg border border-slate-200 font-bold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">RTO</label>
+                                    <input 
+                                        type="number"
+                                        value={newModel.rto}
+                                        onChange={(e) => setNewModel({...newModel, rto: e.target.value})}
+                                        className="w-full text-[10px] p-2 rounded-lg border border-slate-200 font-bold"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[9px] font-bold text-slate-400 uppercase">Permit</label>
+                                    <input 
+                                        type="number"
+                                        value={newModel.permit}
+                                        onChange={(e) => setNewModel({...newModel, permit: e.target.value})}
+                                        className="w-full text-[10px] p-2 rounded-lg border border-slate-200 font-bold"
+                                    />
+                                </div>
+                            </div>
+                            <button 
+                                onClick={handleAddModel} 
+                                className={`w-full py-2.5 rounded-lg ${t.primary} text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all flex items-center justify-center gap-2`}
+                            >
+                                <CheckCircle2 size={14}/> Create Catalog Item
+                            </button>
                         </div>
                     ) : (
                         <button 

@@ -171,6 +171,10 @@ const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', Agree
 const VehicleModelSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true, trim: true }, // e.g., "Rajhans Star"
   type: { type: String, default: 'E-Rickshaw' },
+  exShowroom: { type: Number, default: 0 },
+  insurance: { type: Number, default: 0 },
+  rto: { type: Number, default: 0 },
+  permit: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });
 const VehicleModel = mongoose.models.VehicleModel || mongoose.model('VehicleModel', VehicleModelSchema);
@@ -340,7 +344,23 @@ app.put('/api/challan/:id', verifyToken, async (req, res) => {
 
 app.post('/api/agreement', verifyToken, async (req, res) => {
   try {
-    const newAgreement = await Agreement.create(req.body);
+    // Auto-generate Agreement ID (starts from 1001)
+    const lastAgreement = await Agreement.findOne().sort({ createdAt: -1 });
+    let nextNo = 1001;
+
+    if (lastAgreement && lastAgreement.agreementId) {
+      const lastNo = parseInt(lastAgreement.agreementId, 10);
+      if (!isNaN(lastNo)) {
+        nextNo = lastNo + 1;
+      }
+    }
+
+    const payload = { 
+        ...req.body, 
+        agreementId: nextNo.toString() 
+    };
+
+    const newAgreement = await Agreement.create(payload);
     await Customer.findByIdAndUpdate(req.body.customerId, { $set: { 'pipeline.agreement': true } });
     res.status(201).json(newAgreement);
   } catch (error) {
@@ -396,11 +416,17 @@ app.get('/api/models', verifyToken, async (req, res) => {
 // 2. Add New Model
 app.post('/api/models', verifyToken, async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, exShowroom, insurance, rto, permit } = req.body;
     const existing = await VehicleModel.findOne({ name });
     if (existing) return res.status(400).json({ message: 'Model already exists' });
 
-    const newModel = await VehicleModel.create({ name });
+    const newModel = await VehicleModel.create({ 
+        name, 
+        exShowroom: Number(exShowroom) || 0,
+        insurance: Number(insurance) || 0,
+        rto: Number(rto) || 0,
+        permit: Number(permit) || 0
+    });
     res.status(201).json(newModel);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -490,7 +516,13 @@ app.get('/api/inventory', verifyToken, async (req, res) => {
       return {
         _id: model._id,
         modelName: model.name, // Maps to 'modelName' context in Sales.jsx
-        colors: uniqueColors
+        colors: uniqueColors,
+        pricing: {
+            exShowroom: model.exShowroom || 0,
+            insurance: model.insurance || 0,
+            rto: model.rto || 0,
+            permit: model.permit || 0
+        }
       };
     }));
     res.json(inventory);
