@@ -141,7 +141,7 @@ const AgreementSchema = new mongoose.Schema({
   payment: {
     downPayment: String,
     paidAmount: String,
-    type: String,
+    type: { type: String }, 
     date: Date,
     dues: String,
     netDues: String
@@ -355,13 +355,13 @@ app.post('/api/agreement', verifyToken, async (req, res) => {
       }
     }
 
-    const payload = { 
-        ...req.body, 
-        agreementId: nextNo.toString() 
-    };
+    const payload = { ...req.body };
+    if (!payload.agreementId) {
+        payload.agreementId = nextNo.toString();
+    }
 
     const newAgreement = await Agreement.create(payload);
-    await Customer.findByIdAndUpdate(req.body.customerId, { $set: { 'pipeline.agreement': true } });
+    await Customer.findByIdAndUpdate(payload.customerId, { $set: { 'pipeline.agreement': true } });
     res.status(201).json(newAgreement);
   } catch (error) {
     res.status(500).json({ message: error.message });
