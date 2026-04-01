@@ -645,6 +645,71 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
         type: 'success'
     }));
 
+    // --- 1. Conversion Funnel (Leads -> Bookings -> Deliveries) ---
+    const [leadsCount, bookingsCount, deliveriesCount] = await Promise.all([
+      Customer.countDocuments(),
+      Challan.countDocuments(),
+      Agreement.countDocuments()
+    ]);
+
+    const funnelData = [
+      { name: 'Leads', value: leadsCount, fill: '#cbd5e1' },
+      { name: 'Test Drives', value: Math.round(leadsCount * 0.65), fill: '#94a3b8' }, // Estimated
+      { name: 'Bookings', value: bookingsCount, fill: '#475569' },
+      { name: 'Deliveries', value: deliveriesCount, fill: 'THEME_COLOR' }
+    ];
+
+    // --- 2. Sales Intensity Heatmap (Agreements by Day & Hour) ---
+    const heatmapResults = await Agreement.aggregate([
+      {
+        $project: {
+          day: { $dayOfWeek: "$createdAt" },
+          hour: { $hour: "$createdAt" }
+        }
+      },
+      {
+        $group: {
+          _id: { day: "$day", hour: { $floor: { $divide: ["$hour", 4] } } }, // Group by 4-hour blocks
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const heatmapData = days.map((d, i) => {
+      const hours = [0, 0, 0, 0, 0, 0]; // 6 blocks of 4 hours
+      heatmapResults.forEach(r => {
+        if (r._id.day === i + 1) hours[r._id.hour] = r.count;
+      });
+      return { day: d, hours: hours.map(h => (h > 0 ? (h > 5 ? 4 : h > 2 ? 3 : 2) : 1)) }; // Map count to intensity 1-4
+    });
+
+    // --- 3. Stock Health (Radial) ---
+    const stockStats = await VehicleStock.aggregate([
+      { $group: { _id: "$status", count: { $sum: 1 } } }
+    ]);
+    const totalStock = await VehicleStock.countDocuments();
+    const availableStock = stockStats.find(s => s._id === 'Available')?.count || 0;
+    const soldStock = stockStats.find(s => s._id === 'Sold')?.count || 0;
+    
+    const inventoryData = [
+      { name: 'Stock', uv: totalStock > 0 ? (availableStock / totalStock) * 100 : 0, fill: 'THEME_COLOR' },
+      { name: 'Sold', uv: totalStock > 0 ? (soldStock / totalStock) * 100 : 0, fill: '#334155' }
+    ];
+
+    // --- 4. Efficiency Radar ---
+    const convRate = leadsCount > 0 ? (deliveriesCount / leadsCount) * 100 : 0;
+    const turnoverRate = totalStock > 0 ? (deliveriesCount / totalStock) * 100 : 0;
+
+    const efficiencyData = [
+        { subject: 'Conv.', A: Math.min(150, convRate * 1.5), fullMark: 150 },
+        { subject: 'CSI', A: 110, fullMark: 150 }, // Placeholder
+        { subject: 'Turn.', A: Math.min(150, turnoverRate * 1.5), fullMark: 150 },
+        { subject: 'DSE', A: 130, fullMark: 150 }, // Placeholder
+        { subject: 'Serv.', A: 90, fullMark: 150 }, // Placeholder
+        { subject: 'Mkt.', A: 105, fullMark: 150 }, // Placeholder
+    ];
+
     res.json({
       kpis: [
         { id: 'net_profit', label: 'Net Profit', value: `₹ ${formatter.format(stats.netProfit)}`, raw: stats.netProfit },
@@ -657,7 +722,12 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       modelDistribution,
       recentSales,
       dsePerformance,
-      recentActivity
+      recentActivity,
+      funnelData,
+      heatmapData,
+      inventoryData,
+      efficiencyData,
+      turnoverPct: Math.round(turnoverRate)
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

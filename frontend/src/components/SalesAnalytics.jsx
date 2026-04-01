@@ -94,8 +94,7 @@ const SalesAnalytics = ({ theme: t }) => {
     const salesLog = analyticsData?.recentSales || [];
     const dsePerformance = analyticsData?.dsePerformance || [];
 
-    // Static Mock Data for things not yet in DB
-    const efficiencyData = [
+    const efficiencyData = analyticsData?.efficiencyData || [
         { subject: 'Conv.', A: 120, fullMark: 150 },
         { subject: 'CSI', A: 98, fullMark: 150 },
         { subject: 'Turn.', A: 86, fullMark: 150 },
@@ -104,14 +103,12 @@ const SalesAnalytics = ({ theme: t }) => {
         { subject: 'Mkt.', A: 65, fullMark: 150 },
     ];
 
-    const funnelData = [
-        { name: 'Leads', value: 100, fill: '#cbd5e1' },
-        { name: 'Test Drives', value: 65, fill: '#94a3b8' },
-        { name: 'Bookings', value: 40, fill: '#475569' },
-        { name: 'Deliveries', value: 28, fill: THEME_COLOR },
-    ];
+    const funnelData = (analyticsData?.funnelData || []).map(f => ({
+        ...f,
+        fill: f.fill === 'THEME_COLOR' ? THEME_COLOR : f.fill
+    }));
 
-    const heatmapData = [
+    const heatmapData = analyticsData?.heatmapData || [
         { day: 'Mon', hours: [1, 2, 4, 3, 2, 1] },
         { day: 'Tue', hours: [2, 3, 4, 4, 3, 2] },
         { day: 'Wed', hours: [1, 2, 3, 2, 2, 1] },
@@ -121,11 +118,10 @@ const SalesAnalytics = ({ theme: t }) => {
         { day: 'Sun', hours: [1, 1, 2, 2, 1, 1] },
     ];
 
-    const inventoryData = [
-        { name: 'Age', uv: 31.47, fill: '#334155' },
-        { name: 'Turn', uv: 26.69, fill: '#94a3b8' },
-        { name: 'Order', uv: 15.69, fill: THEME_COLOR },
-    ];
+    const inventoryData = (analyticsData?.inventoryData || []).map(i => ({
+        ...i,
+        fill: i.fill === 'THEME_COLOR' ? THEME_COLOR : i.fill
+    }));
 
     const recentActivity = analyticsData?.recentActivity || [];
 
@@ -495,8 +491,8 @@ const SalesAnalytics = ({ theme: t }) => {
                             </ResponsiveContainer>
                         </div>
                         <div className="absolute bottom-4 text-center">
-                             <span className="text-xl font-black">92%</span>
-                             <span className="text-[8px] block text-slate-400 uppercase">Turnover</span>
+                             <span className="text-xl font-black">{analyticsData?.turnoverPct || 0}%</span>
+                             <span className="text-[8px] block text-slate-400 uppercase">Availability</span>
                         </div>
                     </div>
                 </div>
