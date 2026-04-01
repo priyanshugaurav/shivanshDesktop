@@ -11,8 +11,10 @@ const Dues = ({ theme: t }) => {
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'payment'
     const [selectedDue, setSelectedDue] = useState(null);
     const [paymentAmount, setPaymentAmount] = useState('');
-
-    // --- THEME UTILS ---
+    const [paymentMethod, setPaymentMethod] = useState('Cash');
+    const [duesData, setDuesData] = useState([]);
+    const [paymentHistory, setPaymentHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
     const getThemeGradient = () => {
         if (t.primary.includes('emerald')) return 'from-emerald-500 to-emerald-700';
         if (t.primary.includes('blue')) return 'from-blue-500 to-blue-700';
@@ -23,84 +25,72 @@ const Dues = ({ theme: t }) => {
     };
     const THEME_GRADIENT = getThemeGradient();
 
-    // --- MOCK DATA ---
-    const [duesData, setDuesData] = useState([
-        { 
-            id: 'INV-001', customer: 'Rahul Verma', phone: '+91 98765 43210', 
-            model: 'Rajhans Star', totalAmount: 124000, paidAmount: 80000, 
-            lastPayment: 'Jan 10'
-        },
-        { 
-            id: 'INV-004', customer: 'Md. Altaf', phone: '+91 99887 76655', 
-            model: 'Rajhans Super', totalAmount: 135000, paidAmount: 100000, 
-            lastPayment: 'Jan 15'
-        },
-        { 
-            id: 'INV-007', customer: 'Sita Devi', phone: '+91 88776 65544', 
-            model: 'Rajhans Yodha', totalAmount: 150000, paidAmount: 50000, 
-            lastPayment: 'Jan 05'
-        },
-        { 
-            id: 'INV-012', customer: 'Vikram Singh', phone: '+91 77665 54433', 
-            model: 'Rajhans Plus', totalAmount: 145000, paidAmount: 140000, 
-            lastPayment: 'Jan 18'
-        },
-        { 
-            id: 'INV-015', customer: 'Arjun Kapur', phone: '+91 99112 23344', 
-            model: 'Rajhans Star', totalAmount: 124000, paidAmount: 20000, 
-            lastPayment: 'Dec 20'
-        },
-        { 
-            id: 'INV-018', customer: 'Priya Sharma', phone: '+91 88990 01122', 
-            model: 'Rajhans Super', totalAmount: 135000, paidAmount: 60000, 
-            lastPayment: 'Jan 22'
-        },
-    ]);
+    // --- DATA FETCHING ---
+    const fetchData = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const [duesRes, historyRes] = await Promise.all([
+                fetch('/api/dues', { headers: { 'Authorization': token } }),
+                fetch('/api/dues/history', { headers: { 'Authorization': token } })
+            ]);
 
-    const [paymentHistory, setPaymentHistory] = useState([
-        { id: 'TXN-101', customer: 'Rahul Verma', date: 'Jan 10, 2026', amount: 20000, method: 'Cash' },
-        { id: 'TXN-102', customer: 'Md. Altaf', date: 'Jan 15, 2026', amount: 50000, method: 'UPI' },
-        { id: 'TXN-103', customer: 'Sita Devi', date: 'Jan 05, 2026', amount: 10000, method: 'Cash' },
-        { id: 'TXN-104', customer: 'Vikram Singh', date: 'Jan 18, 2026', amount: 5000, method: 'UPI' },
-    ]);
+            if (duesRes.ok) setDuesData(await duesRes.json());
+            if (historyRes.ok) setPaymentHistory(await historyRes.json());
+        } catch (error) {
+            console.error("Failed to fetch dues:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchData();
+    }, []);
+
+    const totalReceivables = duesData.reduce((acc, curr) => acc + curr.balance, 0);
+    const overdueCount = duesData.filter(d => d.balance > 0).length;
 
     const kpiData = [
-        { label: 'Total Receivables', value: '₹ 8.5 L', icon: Wallet, trend: '+5%', variant: 'primary', sub: 'Total Pending' },
-        { label: 'Overdue Amount', value: '₹ 2.4 L', icon: AlertCircle, trend: '+12%', variant: 'dark', sub: 'Critical Dues' },
-        { label: 'Collection Rate', value: '78%', icon: CheckCircle2, trend: '-2%', variant: 'light', sub: 'Efficiency' },
-        { label: 'Active Debtors', value: '14', icon: User, trend: '0%', variant: 'light', sub: 'Customers' },
+        { label: 'Total Receivables', value: `₹ ${(totalReceivables / 100000).toFixed(2)} L`, icon: Wallet, trend: 'Live', variant: 'primary', sub: 'Total Pending' },
+        { label: 'Overdue Amount', value: `₹ ${(totalReceivables / 100000).toFixed(2)} L`, icon: AlertCircle, trend: 'Live', variant: 'dark', sub: 'Critical Dues' },
+        { label: 'Collection Rate', value: 'Live', icon: CheckCircle2, trend: 'Stable', variant: 'light', sub: 'Efficiency' },
+        { label: 'Active Debtors', value: overdueCount.toString(), icon: User, trend: '0%', variant: 'light', sub: 'Customers' },
     ];
 
     // --- HANDLERS ---
     const handleOpenPayment = (due) => {
         setSelectedDue(due);
         setPaymentAmount('');
+        setPaymentMethod('Cash');
         setViewMode('payment');
     };
 
-    const handleProcessPayment = () => {
+    const handleProcessPayment = async () => {
         if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0) return;
 
-        const amount = Number(paymentAmount);
-        const newDuesData = duesData.map(item => {
-            if (item.id === selectedDue.id) {
-                return { ...item, paidAmount: item.paidAmount + amount };
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/dues/collect', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token
+                },
+                body: JSON.stringify({
+                    agreementId: selectedDue.mongodbId,
+                    amount: paymentAmount,
+                    method: paymentMethod
+                })
+            });
+
+            if (res.ok) {
+                await fetchData(); // Refresh all data
+                setViewMode('list');
+                setSelectedDue(null);
             }
-            return item;
-        });
-
-        const newTransaction = {
-            id: `TXN-${Math.floor(Math.random() * 1000)}`,
-            customer: selectedDue.customer,
-            date: 'Just Now',
-            amount: amount,
-            method: 'Cash'
-        };
-
-        setDuesData(newDuesData);
-        setPaymentHistory([newTransaction, ...paymentHistory]);
-        setViewMode('list');
-        setSelectedDue(null);
+        } catch (error) {
+            console.error("Payment failed:", error);
+        }
     };
 
     // --- RENDER ---
@@ -235,11 +225,11 @@ const Dues = ({ theme: t }) => {
 
                                         {/* 3. Balance (Hero Metric) */}
                                         <div className="col-span-3 text-right pr-4">
-                                            {isCleared ? (
+                                            {due.balance <= 0 ? (
                                                 <span className="text-xs font-bold text-emerald-500 flex items-center justify-end gap-1"><CheckCircle2 size={12}/> Fully Paid</span>
                                             ) : (
                                                 <div>
-                                                    <p className="text-sm font-black text-slate-800">₹{balance.toLocaleString()}</p>
+                                                    <p className="text-sm font-black text-slate-800">₹{due.balance.toLocaleString()}</p>
                                                     <p className="text-[9px] font-bold text-rose-500">Overdue</p>
                                                 </div>
                                             )}
@@ -316,7 +306,7 @@ const Dues = ({ theme: t }) => {
                             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
                                 <div>
                                     <p className="text-[10px] font-bold text-slate-400 uppercase">Current Balance</p>
-                                    <p className="text-lg font-black text-rose-600">₹ {(selectedDue.totalAmount - selectedDue.paidAmount).toLocaleString()}</p>
+                                    <p className="text-lg font-black text-rose-600">₹ {selectedDue.balance.toLocaleString()}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[10px] font-bold text-slate-400 uppercase">Invoice</p>
@@ -342,13 +332,13 @@ const Dues = ({ theme: t }) => {
                                     {/* Quick Amount Pills */}
                                     <div className="flex gap-2 mt-2">
                                         <button 
-                                            onClick={() => setPaymentAmount(selectedDue.totalAmount - selectedDue.paidAmount)} 
+                                            onClick={() => setPaymentAmount(selectedDue.balance)} 
                                             className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-200 transition-colors"
                                         >
                                             Full Due
                                         </button>
                                         <button 
-                                            onClick={() => setPaymentAmount((selectedDue.totalAmount - selectedDue.paidAmount) / 2)} 
+                                            onClick={() => setPaymentAmount((selectedDue.balance) / 2)} 
                                             className="px-3 py-1 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-200 transition-colors"
                                         >
                                             50%
@@ -360,7 +350,15 @@ const Dues = ({ theme: t }) => {
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         {['Cash', 'UPI', 'Cheque'].map(method => (
-                                            <button key={method} className="py-2.5 rounded-xl border-2 border-slate-100 text-[10px] font-bold text-slate-600 hover:border-slate-300 hover:bg-slate-50 focus:border-slate-900 focus:text-slate-900 transition-all">
+                                            <button 
+                                                key={method} 
+                                                onClick={() => setPaymentMethod(method)}
+                                                className={`py-2.5 rounded-xl border-2 text-[10px] font-bold transition-all ${
+                                                    paymentMethod === method 
+                                                    ? 'border-slate-900 bg-slate-900 text-white' 
+                                                    : 'border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                            >
                                                 {method}
                                             </button>
                                         ))}

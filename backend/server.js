@@ -162,7 +162,17 @@ const AgreementSchema = new mongoose.Schema({
 });
 const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', AgreementSchema);
 
-// 4. NEW INVENTORY SCHEMAS (Two-Tier)
+// 5. COLLECTION SCHEMA (For Installments)
+const CollectionSchema = new mongoose.Schema({
+  agreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  amount: { type: Number, required: true },
+  method: { type: String, enum: ['Cash', 'UPI', 'Cheque'], default: 'Cash' },
+  date: { type: Date, default: Date.now }
+});
+const Collection = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema);
+
+// 6. NEW INVENTORY SCHEMAS (Two-Tier)
 
 // Tier 1: Vehicle Model (Catalog Name)
 const VehicleModelSchema = new mongoose.Schema({
@@ -748,6 +758,84 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       availablePerModel,
       totalAvailable
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Dues & Collections Routes ---
+
+app.get('/api/dues', verifyToken, async (req, res) => {
+  try {
+    // Find agreements where netDues > 0
+    const pendingDues = await Agreement.find({
+      $expr: { $gt: [{ $toDouble: "$payment.netDues" }, 0] }
+    }).populate('customerId').sort({ createdAt: -1 });
+
+    const formattedDues = pendingDues.map(d => ({
+      id: d.agreementId || d._id,
+      mongodbId: d._id,
+      customer: `${d.customerId?.personal.firstName} ${d.customerId?.personal.lastName}`,
+      phone: d.customerId?.personal.phone,
+      model: d.model.name,
+      totalAmount: parseFloat(d.model.onRoadPrice) || 0,
+      paidAmount: parseFloat(d.payment.paidAmount) || 0,
+      balance: parseFloat(d.payment.netDues) || 0
+    }));
+
+    res.json(formattedDues);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/dues/collect', verifyToken, async (req, res) => {
+  try {
+    const { agreementId, amount, method } = req.body;
+    const agreement = await Agreement.findById(agreementId);
+    if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
+
+    // 1. Create Collection Entry
+    await Collection.create({
+      agreementId: agreement._id,
+      customerId: agreement.customerId,
+      amount: Number(amount),
+      method: method || 'Cash'
+    });
+
+    // 2. Update Agreement Balance
+    const newPaid = (parseFloat(agreement.payment.paidAmount) || 0) + Number(amount);
+    const newDues = (parseFloat(agreement.payment.netDues) || 0) - Number(amount);
+
+    await Agreement.findByIdAndUpdate(agreementId, {
+      $set: {
+        'payment.paidAmount': newPaid.toString(),
+        'payment.netDues': newDues.toString()
+      }
+    });
+
+    res.json({ message: 'Payment recorded successfully', newDues });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/dues/history', verifyToken, async (req, res) => {
+  try {
+    const history = await Collection.find()
+      .sort({ date: -1 })
+      .limit(20)
+      .populate('customerId');
+
+    const formattedHistory = history.map(h => ({
+      id: h._id,
+      customer: `${h.customerId?.personal.firstName} ${h.customerId?.personal.lastName}`,
+      date: new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      amount: h.amount,
+      method: h.method
+    }));
+
+    res.json(formattedHistory);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
