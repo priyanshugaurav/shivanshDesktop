@@ -614,6 +614,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const paidAmt = safe(formData.payment.paidAmount);
         const dues = (safe(downPayment) - paidAmt).toFixed(2);
         
+        const brokerAmt = safe(formData.broker.amount);
+        const otherAmt = safe(formData.other.amount);
         const baseProfit = (safe(downPayment) - (safe(dtoTotal) + brokerAmt + otherAmt)).toFixed(2);
         
         // 7. Net Profit (NEW: On Road - (RTO + Permit + Insurance + Loan Fee + Broker + Other) - Landing Cost)
