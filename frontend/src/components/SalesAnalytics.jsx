@@ -111,11 +111,8 @@ const SalesAnalytics = ({ theme: t }) => {
 
     const brokerData = analyticsData?.brokerData || [];
 
-    const inventoryData = (analyticsData?.stockData || []).map(i => ({
-        ...i,
-        uv: i.uv,
-        fill: i.fill === 'THEME_COLOR' ? THEME_COLOR : i.fill
-    }));
+    const availablePerModel = analyticsData?.availablePerModel || [];
+    const totalAvailable = analyticsData?.totalAvailable || 0;
 
     const recentActivity = analyticsData?.recentActivity || [];
 
@@ -465,20 +462,35 @@ const SalesAnalytics = ({ theme: t }) => {
                         </div>
                     </div>
 
-                    {/* Stock Availability Stat */}
-                    <div className="bg-slate-900 p-5 rounded-[1.5rem] shadow-lg text-white relative overflow-hidden flex flex-col justify-center items-center h-[120px]">
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 absolute top-4 left-4">Stock Status</h3>
-
-                        <div className="w-full h-[120px] mt-2">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <RadialBarChart cx="50%" cy="50%" innerRadius="40%" outerRadius="100%" barSize={6} data={inventoryData}>
-                                    <RadialBar minAngle={15} background clockWise dataKey="uv" />
-                                </RadialBarChart>
-                            </ResponsiveContainer>
+                    {/* Stock Status breakdown */}
+                    <div className="bg-slate-900 p-5 rounded-[1.5rem] shadow-lg text-white relative overflow-hidden flex flex-col h-[280px]">
+                        <div className="flex justify-between items-center mb-4">
+                             <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Stock Available</h3>
+                             <div className="px-2 py-0.5 bg-white/10 rounded-md text-[10px] font-black text-white">{totalAvailable} Units</div>
                         </div>
-                        <div className="absolute bottom-4 text-center">
-                             <span className="text-xl font-black">{analyticsData?.availabilityPct || 0}%</span>
-                             <span className="text-[8px] block text-slate-400 uppercase">Available</span>
+                        
+                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                            {availablePerModel.length > 0 ? availablePerModel.map((item, i) => (
+                                <div key={i} className="flex flex-col gap-1 group">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] font-bold text-slate-300 truncate max-w-[120px]">{item.name}</span>
+                                        <span className="text-[10px] font-black text-white">{item.count}</span>
+                                    </div>
+                                    <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full ${t.primary} rounded-full transition-all duration-700`}
+                                            style={{ width: `${(item.count / Math.max(totalAvailable, 1)) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="text-[10px] text-slate-500 text-center py-12 italic">No stock available</div>
+                            )}
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
+                             <span className="text-[9px] font-bold text-slate-500 uppercase">Grand Total</span>
+                             <span className="text-sm font-black text-white">{totalAvailable}</span>
                         </div>
                     </div>
                 </div>

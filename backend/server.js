@@ -669,34 +669,27 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       count: b.count
     }));
 
-    // --- 3. Stock Health (Radial: Available vs Total) ---
-    const stockStats = await VehicleStock.aggregate([
-      { $group: { _id: "$status", count: { $sum: 1 } } }
+    // --- 3. Available Stock Inventory Breakdown ---
+    const availableStockResults = await VehicleStock.aggregate([
+      { $match: { status: 'Available' } },
+      {
+        $lookup: {
+          from: 'vehiclemodels', // Check the collection name in your DB
+          localField: 'modelId',
+          foreignField: '_id',
+          as: 'model'
+        }
+      },
+      { $unwind: '$model' },
+      { $group: { _id: '$model.name', count: { $sum: 1 } } }
     ]);
-    const totalStock = await VehicleStock.countDocuments();
-    const availableStock = stockStats.find(s => s._id === 'Available')?.count || 0;
-    const soldStock = stockStats.find(s => s._id === 'Sold')?.count || 0;
-    
-    // We'll use this for the Radial Chart
-    const stockData = [
-      { name: 'Available', uv: totalStock > 0 ? (availableStock / totalStock) * 100 : 0, fill: 'THEME_COLOR' },
-      { name: 'Sold', uv: totalStock > 0 ? (soldStock / totalStock) * 100 : 0, fill: '#334155' }
-    ];
 
-    // --- 4. Payment Dues (Radar: Paid vs Dues) ---
-    const paymentStats = agreements.reduce((acc, curr) => {
-        acc.paid += (parseFloat(curr.payment.paidAmount) || 0);
-        acc.dues += (parseFloat(curr.payment.netDues) || 0);
-        return acc;
-    }, { paid: 0, dues: 0 });
+    const availablePerModel = availableStockResults.map(r => ({
+      name: r._id,
+      count: r.count
+    }));
 
-    const totalContractValue = paymentStats.paid + paymentStats.dues;
-    const duesRadar = [
-        { subject: 'Paid', A: totalContractValue > 0 ? (paymentStats.paid / totalContractValue) * 100 : 0, fullMark: 100 },
-        { subject: 'Dues', A: totalContractValue > 0 ? (paymentStats.dues / totalContractValue) * 100 : 0, fullMark: 100 },
-        { subject: 'Finance', A: 85, fullMark: 100 }, // Estimate
-        { subject: 'Margin', A: 75, fullMark: 100 }, // Estimate
-    ];
+    const totalAvailable = availablePerModel.reduce((acc, curr) => acc + curr.count, 0);
 
     res.json({
       kpis: [
@@ -713,9 +706,9 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       recentActivity,
       funnelData,
       brokerData,
-      stockData,
       duesRadar,
-      availabilityPct: totalStock > 0 ? Math.round((availableStock / totalStock) * 100) : 0
+      availablePerModel,
+      totalAvailable
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
