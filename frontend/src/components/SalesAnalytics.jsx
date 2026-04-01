@@ -103,8 +103,11 @@ const SalesAnalytics = ({ theme: t }) => {
         { subject: 'Mkt.', A: 65, fullMark: 150 },
     ];
 
-    const funnelData = (analyticsData?.funnelData || []).map(f => ({
+    const rawFunnel = (analyticsData?.funnelData || []);
+    const maxFunnel = Math.max(...rawFunnel.map(f => f.value), 1);
+    const funnelData = rawFunnel.map(f => ({
         ...f,
+        percent: (f.value / maxFunnel) * 100,
         fill: f.fill === 'THEME_COLOR' ? THEME_COLOR : f.fill
     }));
 

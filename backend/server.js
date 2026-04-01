@@ -653,10 +653,9 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     ]);
 
     const funnelData = [
-      { name: 'Leads', value: leadsCount, fill: '#cbd5e1' },
-      { name: 'Test Drives', value: Math.round(leadsCount * 0.65), fill: '#94a3b8' }, // Estimated
-      { name: 'Bookings', value: bookingsCount, fill: '#475569' },
-      { name: 'Deliveries', value: deliveriesCount, fill: 'THEME_COLOR' }
+      { name: 'Total Customer', value: leadsCount, fill: '#cbd5e1' },
+      { name: 'Challan', value: bookingsCount, fill: '#94a3b8' },
+      { name: 'Agreement', value: deliveriesCount, fill: 'THEME_COLOR' }
     ];
 
     // --- 2. Sales Intensity Heatmap (Agreements by Day & Hour) ---
