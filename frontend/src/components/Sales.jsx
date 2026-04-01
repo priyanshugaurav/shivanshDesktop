@@ -586,79 +586,84 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
-    // Auto-calculate On Road Price
+    // MASTER CALCULATION HOOK (8 CALCS)
     useEffect(() => {
-        const ex = parseFloat(formData.model.exShowroom) || 0;
-        const ins = parseFloat(formData.model.insurance) || 0;
-        const rto = parseFloat(formData.model.rto) || 0;
-        const pmt = parseFloat(formData.model.permit) || 0;
-        const total = (ex + ins + rto + pmt).toFixed(2);
+        const safe = (val) => parseFloat(val) || 0;
         
-        if (formData.model.onRoadPrice !== total) {
-            handleDeepChange('model', 'onRoadPrice', total);
-        }
-    }, [formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit]);
-    
-    // Auto-calculate DTO Total
-    useEffect(() => {
-        const permit = parseFloat(formData.dto.permit) || 0;
-        const reg = parseFloat(formData.dto.registration) || 0;
-        const online = parseFloat(formData.dto.onlinePayment) || 0;
-        const total = (permit + reg + online).toFixed(2);
+        // 1. On Road Price
+        const exShowroom = safe(formData.model.exShowroom);
+        const insurance = safe(formData.model.insurance);
+        const rto = safe(formData.model.rto);
+        const permit = safe(formData.model.permit);
+        const onRoadPrice = (exShowroom + insurance + rto + permit).toFixed(2);
         
-        if (formData.dto.total !== total) {
-            handleDeepChange('dto', 'total', total);
-        }
-    }, [formData.dto.permit, formData.dto.registration, formData.dto.onlinePayment]);
+        // 2. DTO Total
+        const dtoReg = safe(formData.dto.registration);
+        const dtoOnline = safe(formData.dto.onlinePayment);
+        const dtoPermit = safe(formData.dto.permit);
+        const dtoTotal = (dtoReg + dtoOnline + dtoPermit).toFixed(2);
+        
+        // 3. Magadh Margin
+        const bankFee = safe(formData.loan.processingFee);
+        const loanAmt = safe(formData.loan.amount);
+        const magadhMargin = ((exShowroom + insurance + bankFee) - loanAmt).toFixed(2);
+        
+        // 4. Down Payment (Manual logic from user: On Road - Loan)
+        const downPayment = (safe(onRoadPrice) - loanAmt).toFixed(2);
+        
+        // 5. Dues (Down payment - Paid amount)
+        const paidAmt = safe(formData.payment.paidAmount);
+        const dues = (safe(downPayment) - paidAmt).toFixed(2);
+        
+        // 6. Base Profit
+        const brokerAmt = safe(formData.broker.amount);
+        const otherAmt = safe(formData.other.amount);
+        const baseProfit = (safe(downPayment) - (safe(magadhMargin) + safe(dtoTotal) + brokerAmt + otherAmt)).toFixed(2);
+        
+        // 7. Net Profit (Includes Commission)
+        const commission = safe(formData.dse.commission);
+        const netProfit = (safe(baseProfit) + commission).toFixed(2);
+        
+        // 8. TDS and Final Net Profit
+        const tds = (commission * 0.05).toFixed(2);
+        const finalNetProfit = (safe(netProfit) - safe(tds)).toFixed(2);
+        
+        // Update State (Avoiding infinite loops by comparing values)
+        const needsUpdate = (
+            formData.model.onRoadPrice !== onRoadPrice ||
+            formData.dto.total !== dtoTotal ||
+            formData.magadh.margin !== magadhMargin ||
+            formData.payment.downPayment !== downPayment ||
+            formData.payment.dues !== dues ||
+            formData.payment.netDues !== dues || // Syncing net dues initially too
+            formData.dse.netProfit !== netProfit ||
+            formData.dse.tds !== tds ||
+            formData.dse.finalNetProfit !== finalNetProfit
+        );
 
-    // Auto-calculate Customer Down Payment
-    useEffect(() => {
-        const onRoad = parseFloat(formData.model.onRoadPrice) || 0;
-        const loan = parseFloat(formData.loan.amount) || 0;
-        const processing = parseFloat(formData.loan.processingFee) || 0;
-        const dtoTotal = parseFloat(formData.dto.total) || 0;
-        const broker = parseFloat(formData.broker.amount) || 0;
-        const other = parseFloat(formData.other.amount) || 0;
-        
-        const total = (onRoad + loan + processing + dtoTotal + broker + other).toFixed(2);
-        
-        if (formData.payment.downPayment !== total) {
-            handleDeepChange('payment', 'downPayment', total);
+        if (needsUpdate) {
+            setFormData(prev => ({
+                ...prev,
+                model: { ...prev.model, onRoadPrice },
+                dto: { ...prev.dto, total: dtoTotal },
+                magadh: { ...prev.magadh, margin: magadhMargin },
+                payment: { 
+                    ...prev.payment, 
+                    downPayment, 
+                    dues, 
+                    netDues: (prev.payment.netDues === prev.payment.dues || !initialData) ? dues : prev.payment.netDues 
+                },
+                dse: { ...prev.dse, netProfit, tds, finalNetProfit }
+            }));
         }
     }, [
-        formData.model.onRoadPrice, 
-        formData.loan.amount, 
-        formData.loan.processingFee, 
-        formData.dto.total, 
-        formData.broker.amount, 
-        formData.other.amount
+        formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit,
+        formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit,
+        formData.loan.processingFee, formData.loan.amount,
+        formData.payment.paidAmount,
+        formData.broker.amount, formData.other.amount,
+        formData.dse.commission
     ]);
-
-    // Auto-calculate Dues
-    useEffect(() => {
-        const dp = parseFloat(formData.payment.downPayment) || 0;
-        const paid = parseFloat(formData.payment.paidAmount) || 0;
-        const calculatedDues = (dp - paid).toFixed(2);
-        
-        if (formData.payment.dues !== calculatedDues) {
-            // Check if we also need to update Net Dues (auto-sync only if they were already equal)
-            const shouldSyncNet = !initialData || formData.payment.netDues === formData.payment.dues;
-            
-            setFormData(prev => {
-                const next = {
-                    ...prev,
-                    payment: { 
-                        ...prev.payment, 
-                        dues: calculatedDues
-                    }
-                };
-                if (shouldSyncNet) {
-                    next.payment.netDues = calculatedDues;
-                }
-                return next;
-            });
-        }
-    }, [formData.payment.downPayment, formData.payment.paidAmount]);
 
     // Handle Model Selection Sync
     const onModelSelect = (modelName) => {
@@ -845,12 +850,22 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                             <select value={formData.dse.name} onChange={e => handleDeepChange('dse', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">SELECT DSE</option><option value="Ashok Sah">Ashok Sah</option></select>
                           </div>
                           <Input label="Commission" value={formData.dse.commission} onChange={v => handleDeepChange('dse', 'commission', v)} theme={theme} />
-                          <Input label="Net Profit" value={formData.dse.netProfit} onChange={v => handleDeepChange('dse', 'netProfit', v)} theme={theme} />
-                          <div className="md:row-span-2">
-                             <Input label="Magadh Margin" value={formData.magadh.margin} onChange={v => handleDeepChange('magadh', 'margin', v)} theme={theme} />
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Net Profit (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.netProfit}</div>
                           </div>
-                          <Input label="TDS (5%)" value={formData.dse.tds} onChange={v => handleDeepChange('dse', 'tds', v)} theme={theme} />
-                          <Input label="Final Net Profit" value={formData.dse.finalNetProfit} onChange={v => handleDeepChange('dse', 'finalNetProfit', v)} theme={theme} />
+                          <div className="md:row-span-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Magadh Margin (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.magadh.margin}</div>
+                          </div>
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">TDS 5% (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.tds}</div>
+                          </div>
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Final Net Profit (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.finalNetProfit}</div>
+                          </div>
                           <Input label="Magadh Payment Date" type="date" value={formData.magadh.paymentDate} onChange={v => handleDeepChange('magadh', 'paymentDate', v)} theme={theme} />
                       </div>
                   </div>
