@@ -512,8 +512,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       broker: { name: '', phone: '', village: '', amount: '' },
       payment: { downPayment: '', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
       other: { amount: '', remark: '' },
-      dse: { name: '', commission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' },
-      magadh: { margin: '0.00', paymentDate: '' }
+      dse: { name: '', commission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' }
     });
 
     const [stocks, setStocks] = useState([]);
@@ -604,10 +603,9 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const dtoPermit = safe(formData.dto.permit);
         const dtoTotal = rto.toFixed(2); 
         
-        // 3. Magadh Margin
+        // 3. Magadh Margin (REMOVED)
         const bankFee = safe(formData.loan.processingFee);
         const loanAmt = safe(formData.loan.amount);
-        const magadhMargin = ((exShowroom + insurance + bankFee) - loanAmt).toFixed(2);
         
         // 4. Down Payment (Manual logic from user: On Road - Loan)
         const downPayment = (safe(onRoadPrice) - loanAmt).toFixed(2);
@@ -616,10 +614,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const paidAmt = safe(formData.payment.paidAmount);
         const dues = (safe(downPayment) - paidAmt).toFixed(2);
         
-        // 6. Base Profit (Legacy calculation kept for internal use if needed, but suppressed)
-        const brokerAmt = safe(formData.broker.amount);
-        const otherAmt = safe(formData.other.amount);
-        const baseProfit = (safe(downPayment) - (safe(magadhMargin) + safe(dtoTotal) + brokerAmt + otherAmt)).toFixed(2);
+        const baseProfit = (safe(downPayment) - (safe(dtoTotal) + brokerAmt + otherAmt)).toFixed(2);
         
         // 7. Net Profit (NEW: On Road - (RTO + Permit + Insurance + Loan Fee + Broker + Other) - Landing Cost)
         const landingPrice = safe(formData.model.landingPrice);
@@ -634,7 +629,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const needsUpdate = (
             formData.model.onRoadPrice !== onRoadPrice ||
             formData.dto.total !== dtoTotal ||
-            formData.magadh.margin !== magadhMargin ||
             formData.payment.downPayment !== downPayment ||
             formData.payment.dues !== dues ||
             formData.payment.netDues !== dues || // Syncing net dues initially too
@@ -648,7 +642,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                 ...prev,
                 model: { ...prev.model, onRoadPrice },
                 dto: { ...prev.dto, total: dtoTotal },
-                magadh: { ...prev.magadh, margin: magadhMargin },
                 payment: { 
                     ...prev.payment, 
                     downPayment, 
@@ -863,10 +856,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Net Profit (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.netProfit}</div>
                           </div>
-                          <div className="md:row-span-1">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Magadh Margin (Auto)</label>
-                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.magadh.margin}</div>
-                          </div>
                           <div className="space-y-1">
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">TDS 5% (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.tds}</div>
@@ -875,7 +864,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Final Net Profit (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.finalNetProfit}</div>
                           </div>
-                          <Input label="Magadh Payment Date" type="date" value={formData.magadh.paymentDate} onChange={v => handleDeepChange('magadh', 'paymentDate', v)} theme={theme} />
                       </div>
                   </div>
               </form>

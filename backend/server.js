@@ -158,10 +158,6 @@ const AgreementSchema = new mongoose.Schema({
     tds: String,
     finalNetProfit: String
   },
-  magadh: {
-    margin: String,
-    paymentDate: Date
-  },
   createdAt: { type: Date, default: Date.now }
 });
 const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', AgreementSchema);
