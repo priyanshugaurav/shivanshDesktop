@@ -506,7 +506,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     
     const [formData, setFormData] = useState(initialData || {
       agreementId: '',
-      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', onRoadPrice: '0.00' },
+      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', onRoadPrice: '0.00', landingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
       dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
@@ -550,7 +550,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                                         exShowroom: (unitData.exShowroom || 0).toString(),
                                         insurance: (unitData.insurance || 0).toString(),
                                         rto: (unitData.rto || 0).toString(),
-                                        permit: (unitData.permit || 0).toString()
+                                        permit: (unitData.permit || 0).toString(),
+                                        landingPrice: (unitData.purchaseRate || 0).toString()
                                     }
                                 }));
                                 return; // Data filled, exit early
@@ -597,11 +598,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const permit = safe(formData.model.permit);
         const onRoadPrice = (exShowroom + insurance + rto + permit).toFixed(2);
         
-        // 2. DTO Total
+        // 2. DTO Total (New: DTO Total = RTO)
         const dtoReg = safe(formData.dto.registration);
         const dtoOnline = safe(formData.dto.onlinePayment);
         const dtoPermit = safe(formData.dto.permit);
-        const dtoTotal = (dtoReg + dtoOnline + dtoPermit).toFixed(2);
+        const dtoTotal = rto.toFixed(2); 
         
         // 3. Magadh Margin
         const bankFee = safe(formData.loan.processingFee);
@@ -615,14 +616,14 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const paidAmt = safe(formData.payment.paidAmount);
         const dues = (safe(downPayment) - paidAmt).toFixed(2);
         
-        // 6. Base Profit
+        // 6. Base Profit (Legacy calculation kept for internal use if needed, but suppressed)
         const brokerAmt = safe(formData.broker.amount);
         const otherAmt = safe(formData.other.amount);
         const baseProfit = (safe(downPayment) - (safe(magadhMargin) + safe(dtoTotal) + brokerAmt + otherAmt)).toFixed(2);
         
-        // 7. Net Profit (Includes Commission)
-        const commission = safe(formData.dse.commission);
-        const netProfit = (safe(baseProfit) + commission).toFixed(2);
+        // 7. Net Profit (NEW: On Road - (RTO + Permit + Insurance + Loan Fee + Broker + Other) - Landing Cost)
+        const landingPrice = safe(formData.model.landingPrice);
+        const netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
         
         // 8. TDS and Final Net Profit
         const tds = (commission * 0.05).toFixed(2);
@@ -662,7 +663,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         formData.loan.processingFee, formData.loan.amount,
         formData.payment.paidAmount,
         formData.broker.amount, formData.other.amount,
-        formData.dse.commission
+        formData.dse.commission,
+        formData.model.landingPrice // Added landingPrice to dependencies
     ]);
 
     // Handle Model Selection Sync
@@ -679,7 +681,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                     exShowroom: (selectedModel.pricing.exShowroom || 0).toString(),
                     insurance: (selectedModel.pricing.insurance || 0).toString(),
                     rto: (selectedModel.pricing.rto || 0).toString(),
-                    permit: (selectedModel.pricing.permit || 0).toString()
+                    permit: (selectedModel.pricing.permit || 0).toString(),
+                    landingPrice: (selectedModel.purchaseRate || 0).toString()
                 }
             }));
         } else {
@@ -772,6 +775,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">On Road Price (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{formData.model.onRoadPrice}</div>
                           </div>
+                          <Input label="Landing Cost (Ex-Showroom + Taxes)" value={formData.model.landingPrice} onChange={v => handleDeepChange('model', 'landingPrice', v)} theme={theme} />
                       </div>
                   </div>
 
@@ -796,7 +800,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                             <div className="grid grid-cols-2 gap-4">
                                 <Input label="DTO Permit" value={formData.dto.permit} onChange={v => handleDeepChange('dto', 'permit', v)} theme={theme} />
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Total (Auto)</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Total (Matches RTO)</label>
                                     <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">
                                         {formData.dto.total}
                                     </div>

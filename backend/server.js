@@ -118,7 +118,8 @@ const AgreementSchema = new mongoose.Schema({
     insurance: String,
     rto: String,
     permit: String,
-    onRoadPrice: String
+    onRoadPrice: String,
+    landingPrice: String
   },
   loan: {
     bankName: String,
