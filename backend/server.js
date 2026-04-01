@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 const app = express();
+const frontendPath = path.join(__dirname, '../frontend/dist');
 
 
 // --- CORS: allow env-configured origin (or any in dev) ---
@@ -154,10 +155,14 @@ const AgreementSchema = new mongoose.Schema({
   dse: {
     name: String,
     commission: String,
+    dseCommission: String,
     netProfit: String,
     tds: String,
     finalNetProfit: String
   },
+  registrationNo: String,
+  permitNo: String,
+  permitDate: Date,
   createdAt: { type: Date, default: Date.now }
 });
 const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', AgreementSchema);
@@ -172,7 +177,68 @@ const CollectionSchema = new mongoose.Schema({
 });
 const Collection = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema);
 
-// 6. NEW INVENTORY SCHEMAS (Two-Tier)
+// 6. EMPLOYEE SCHEMA (For Staff & Payroll)
+const EmployeeSchema = new mongoose.Schema({
+  personal: {
+    firstName: String,
+    lastName: String,
+    phone: String,
+    email: String,
+    dob: String,
+    bloodGroup: String,
+    address: String
+  },
+  professional: {
+    employeeId: { type: String, unique: true },
+    role: { type: String, default: 'DSE' },
+    status: { type: String, enum: ['Active', 'On Leave', 'Probation', 'Left'], default: 'Probation' },
+    location: { type: String, default: 'Showroom' },
+    joinDate: { type: Date, default: Date.now },
+  },
+  financial: {
+    baseSalary: { type: Number, default: 0 },
+    allowance: { type: Number, default: 0 },
+    incentives: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 }
+  },
+  createdAt: { type: Date, default: Date.now }
+});
+const Employee = mongoose.models.Employee || mongoose.model('Employee', EmployeeSchema);
+ 
+// 6.5 SALARY RECORD SCHEMA (Monthly Payments)
+const SalaryRecordSchema = new mongoose.Schema({
+  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
+  month: { type: String, required: true }, // e.g: "March"
+  year: { type: Number, required: true },  // e.g: 2026
+  baseSalary: Number,
+  allowance: Number,
+  incentives: Number,
+  tax: Number,
+  otherAmount: { type: Number, default: 0 },
+  remark: { type: String, default: '' },
+  totalPayable: Number,
+  paymentDate: { type: Date, default: Date.now },
+  status: { type: String, enum: ['Paid', 'Pending', 'Adjusted'], default: 'Paid' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SalaryRecord = mongoose.models.SalaryRecord || mongoose.model('SalaryRecord', SalaryRecordSchema);
+ 
+// 6.7 EXPENSE SCHEMA
+const ExpenseSchema = new mongoose.Schema({
+  id: String, // Auto-generated ID (e.g., EXP-001)
+  category: { type: String, required: true },
+  description: String,
+  amount: { type: Number, required: true },
+  date: { type: Number, required: true }, // Day of month (1-31)
+  month: { type: String, required: true },
+  year: { type: Number, required: true },
+  status: { type: String, default: 'Paid' },
+  type: { type: String, enum: ['Manual', 'Payroll'], default: 'Manual' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Expense = mongoose.models.Expense || mongoose.model('Expense', ExpenseSchema);
+
+// 7. NEW INVENTORY SCHEMAS (Two-Tier)
 
 // Tier 1: Vehicle Model (Catalog Name)
 const VehicleModelSchema = new mongoose.Schema({
@@ -254,6 +320,104 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token, user: { id: user._id, username: user.username, role: user.role } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. ENQUIRY SCHEMA (CRM)
+const EnquirySchema = new mongoose.Schema({
+  Name: String,
+  Phone: String,
+  Village: String,
+  Model: String,
+  status: { type: String, default: 'New' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Enquiry = mongoose.models.Enquiry || mongoose.model('Enquiry', EnquirySchema);
+
+// --- Dashboard Stats Route ---
+app.get('/api/dashboard/stats', verifyToken, async (req, res) => {
+  try {
+    const now = new Date();
+    const currentMonth = now.toLocaleString('default', { month: 'long' });
+    const currentYear = now.getFullYear();
+
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = lastMonthDate.toLocaleString('default', { month: 'long' });
+    const lastMonthYear = lastMonthDate.getFullYear();
+
+    // 1. Profit (From Agreements - dse.finalNetProfit)
+    const agreements = await Agreement.find({
+      createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), 1) }
+    });
+    const currentMonthProfit = agreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
+    const currentMonthRevenue = agreements.reduce((acc, curr) => acc + (Number(curr.payment?.paidAmount) || 0), 0);
+
+    const lastMonthAgreements = await Agreement.find({
+      createdAt: { 
+        $gte: new Date(lastMonthYear, lastMonthDate.getMonth(), 1),
+        $lt: new Date(now.getFullYear(), now.getMonth(), 1)
+      }
+    });
+    const lastMonthProfit = lastMonthAgreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
+    const profitGrowth = lastMonthProfit === 0 ? 100 : ((currentMonthProfit - lastMonthProfit) / lastMonthProfit) * 100;
+
+    // 2. Enquiries
+    const totalEnquiries = await Enquiry.countDocuments({ status: { $ne: 'Closed' } });
+    const hotEnquiries = await Enquiry.countDocuments({ status: 'Hot' });
+    const newEnquiries = await Enquiry.countDocuments({ status: 'New' });
+
+    // 3. Inventory
+    const totalInventory = await VehicleStock.countDocuments({ status: 'Available' });
+    const lowStockAlert = await VehicleStock.findOne({ status: 'Available' }).populate('modelId');
+    
+    // 4. Pending Dues
+    const allAgreements = await Agreement.find();
+    const totalDues = allAgreements.reduce((acc, curr) => acc + (Number(curr.payment?.netDues) || 0), 0);
+    const overdueCount = allAgreements.filter(a => Number(a.payment?.netDues) > 0).length;
+
+    // 5. Staff Presence
+    const activeStaff = await Employee.countDocuments({ 'professional.status': 'Active' });
+    const totalStaff = await Employee.countDocuments();
+
+    // 6. Expenses
+    const currentMonthExpenses = await Expense.find({ month: currentMonth, year: currentYear });
+    const totalExpenses = currentMonthExpenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const payrollExpenses = currentMonthExpenses.filter(e => e.type === 'Payroll').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const payrollPercentage = totalExpenses === 0 ? 0 : Math.round((payrollExpenses / totalExpenses) * 100);
+
+    res.json({
+      revenue: {
+        amount: currentMonthProfit, // User wants this to be Net Profit
+        growth: profitGrowth.toFixed(1)
+      },
+      collections: { // Kept separate just in case
+        amount: currentMonthRevenue 
+      },
+      enquiries: {
+        total: totalEnquiries,
+        hot: hotEnquiries,
+        new: newEnquiries
+      },
+      inventory: {
+        total: totalInventory,
+        alert: lowStockAlert ? `${lowStockAlert.modelId.name} (${lowStockAlert.color})` : 'Stable'
+      },
+      dues: {
+        amount: totalDues,
+        customers: overdueCount
+      },
+      staff: {
+        active: activeStaff,
+        total: totalStaff
+      },
+      expenses: {
+        amount: totalExpenses,
+        payrollPercentage
+      }
+    });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -380,6 +544,40 @@ app.get('/api/agreement/:customerId', verifyToken, async (req, res) => {
     const agreement = await Agreement.findOne({ customerId: req.params.customerId });
     if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
     res.json(agreement);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all agreements for a specific staff (DSE) by name
+app.get('/api/agreements/staff/:name', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find({ 'dse.name': req.params.name })
+                                     .populate('customerId')
+                                     .sort({ createdAt: -1 });
+    res.json(agreements);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET: All agreements for Registration Queue with enriched data
+app.get('/api/agreements/registration-queue', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find()
+                                     .populate('customerId')
+                                     .sort({ createdAt: -1 });
+    
+    const enriched = await Promise.all(agreements.map(async (agg) => {
+      // Try to find matching chassis no from Challan
+      const challan = await Challan.findOne({ customer: agg.customerId?._id });
+      return {
+        ...agg.toObject(),
+        chassis: challan?.engine?.frameNo || 'N/A'
+      };
+    }));
+    
+    res.json(enriched);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -841,9 +1039,245 @@ app.get('/api/dues/history', verifyToken, async (req, res) => {
   }
 });
 
+// --- Employee Routes ---
+
+app.get('/api/employees', verifyToken, async (req, res) => {
+  try {
+    const employees = await Employee.find().sort({ 'professional.joinDate': -1 });
+    res.json(employees);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/employees', verifyToken, async (req, res) => {
+  try {
+    const { personal, professional, financial } = req.body;
+    
+    // Auto-generate Employee ID
+    const count = await Employee.countDocuments();
+    const year = new Date().getFullYear();
+    const employeeId = `EMP-${year}-${(count + 1).toString().padStart(3, '0')}`;
+
+    const newEmployee = new Employee({
+      personal,
+      professional: { ...professional, employeeId },
+      financial
+    });
+
+    res.status(201).json(newEmployee);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/employees/:id', verifyToken, async (req, res) => {
+  try {
+    const { personal, professional, financial } = req.body;
+    const updatedEmployee = await Employee.findByIdAndUpdate(
+      req.params.id,
+      { personal, professional, financial },
+      { new: true }
+    );
+    if (!updatedEmployee) return res.status(404).json({ message: 'Employee not found' });
+    res.json(updatedEmployee);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/employees/:id', verifyToken, async (req, res) => {
+  try {
+    const employee = await Employee.findByIdAndDelete(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    
+    // Also cleanup any salary records
+    await SalaryRecord.deleteMany({ employeeId: req.params.id });
+    
+    res.json({ message: 'Employee and their payroll history deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Process Payroll (Monthly Salary Record)
+app.post('/api/employees/:id/payroll', verifyToken, async (req, res) => {
+  try {
+    const { month, year, baseSalary, allowance, incentives, tax, otherAmount, remark, totalPayable } = req.body;
+    
+    // Check if duplicate for the same month/year
+    const existing = await SalaryRecord.findOne({ employeeId: req.params.id, month, year });
+    if (existing) return res.status(400).json({ message: 'Payroll for this month/year already processed.' });
+
+    const record = await SalaryRecord.create({
+      employeeId: req.params.id,
+      month,
+      year,
+      baseSalary,
+      allowance,
+      incentives,
+      tax,
+      otherAmount,
+      remark,
+      totalPayable,
+      status: 'Paid'
+    });
+    
+    // Auto-generate Expense Entry for Payroll
+    const emp = await Employee.findById(req.params.id);
+    const empName = emp ? `${emp.personal.firstName} ${emp.personal.lastName}` : 'Staff';
+    
+    const count = await Expense.countDocuments();
+    const expenseId = `EXP-${(count + 1).toString().padStart(3, '0')}`;
+    
+    await Expense.create({
+        id: expenseId,
+        category: 'Salary',
+        description: `Staff Payroll: ${empName} (${month} ${year})`,
+        amount: totalPayable,
+        date: new Date().getDate(),
+        month,
+        year,
+        status: 'Processed',
+        type: 'Payroll'
+    });
+
+    res.status(201).json(record);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete Salary Record (Void Payroll)
+app.delete('/api/employees/:id/payroll/:recordId', verifyToken, async (req, res) => {
+  try {
+    const record = await SalaryRecord.findById(req.params.recordId);
+    if (!record) return res.status(404).json({ message: 'Salary record not found' });
+
+    // 1. Find and Delete associated Expense
+    const emp = await Employee.findById(req.params.id);
+    if (emp) {
+        const empName = `${emp.personal.firstName} ${emp.personal.lastName}`;
+        const description = `Staff Payroll: ${empName} (${record.month} ${record.year})`;
+        await Expense.findOneAndDelete({ 
+            category: 'Salary', 
+            type: 'Payroll', 
+            description,
+            month: record.month,
+            year: record.year
+        });
+    }
+
+    // 2. Delete the Salary Record
+    await SalaryRecord.findByIdAndDelete(req.params.recordId);
+
+    res.json({ message: 'Payroll record voided and expense removed.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/employees/:id/payroll', verifyToken, async (req, res) => {
+  try {
+    const history = await SalaryRecord.find({ employeeId: req.params.id }).sort({ year: -1, createdAt: -1 });
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // --- Serve React frontend (production/local fallback) ---
-const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));
+
+// 9. EXPENSE ROUTES
+app.get('/api/expenses', verifyToken, async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const filter = {};
+    if (month) filter.month = month;
+    if (year) filter.year = Number(year);
+    
+    // Self-Healing: Backfill missing payroll expenses for the filtered period
+    if (month && year) {
+        const salaries = await SalaryRecord.find({ month, year: Number(year) });
+        for (const sal of salaries) {
+            // Check if expense exists for this specific salary record
+            const emp = await Employee.findById(sal.employeeId);
+            const empName = emp ? `${emp.personal.firstName} ${emp.personal.lastName}` : 'Staff';
+            const description = `Staff Payroll: ${empName} (${month} ${year})`;
+            
+            const existingExpense = await Expense.findOne({ 
+                category: 'Salary', 
+                type: 'Payroll', 
+                description,
+                month,
+                year: Number(year)
+            });
+            
+            if (!existingExpense) {
+                const count = await Expense.countDocuments();
+                await Expense.create({
+                    id: `EXP-${(count + 1).toString().padStart(3, '0')}`,
+                    category: 'Salary',
+                    description,
+                    amount: sal.totalPayable,
+                    date: 1, // Use 1st of month for historical backfills 
+                    month,
+                    year: Number(year),
+                    status: 'Processed',
+                    type: 'Payroll'
+                });
+            }
+        }
+    }
+
+    const expenses = await Expense.find(filter).sort({ createdAt: -1 });
+    res.json(expenses);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/expenses', verifyToken, async (req, res) => {
+  try {
+    const { category, description, amount, date, month, year } = req.body;
+    
+    const count = await Expense.countDocuments();
+    const expenseId = `EXP-${(count + 1).toString().padStart(3, '0')}`;
+
+    const newExpense = await Expense.create({
+      id: expenseId,
+      category,
+      description,
+      amount: Number(amount),
+      date: Number(date) || new Date().getDate(),
+      month,
+      year,
+      status: 'Paid',
+      type: 'Manual'
+    });
+    
+    res.status(201).json(newExpense);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
+  try {
+    const expense = await Expense.findById(req.params.id);
+    if (!expense) return res.status(404).json({ message: 'Expense not found' });
+    
+    if (expense.type === 'Payroll') {
+        return res.status(403).json({ message: 'Automated payroll expenses cannot be deleted manually.' });
+    }
+    
+    await Expense.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Catch-all: serve index.html for all non-API routes (React Router support)
 // Fixed for Express 5: using app.use instead of app.get('*') to avoid PathError
@@ -857,10 +1291,11 @@ app.use((req, res) => {
 });
 
 
+
 // Start server only when run directly (not as a serverless function)
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+  app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
 }
 
 // Global Error Handler for debugging Serverless environment

@@ -512,10 +512,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       broker: { name: '', phone: '', village: '', amount: '' },
       payment: { downPayment: '', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
       other: { amount: '', remark: '' },
-      dse: { name: '', commission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' }
+      dse: { name: '', commission: '', dseCommission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' }
     });
 
     const [stocks, setStocks] = useState([]);
+    const [dseList, setDseList] = useState([]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -530,7 +531,19 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                     setStocks(invData);
                 }
 
-                // 2. If creating new, fetch challan to auto-fill data
+                // 2. Fetch Employees for DSE Selection
+                const empRes = await fetch(`${API_URL}/employees`, { headers: { 'Authorization': token } });
+                if (empRes.ok) {
+                    const empData = await empRes.json();
+                    // Filter: Only Active DSEs
+                    const dses = empData.filter(e => 
+                        e.professional?.role === 'DSE' && 
+                        e.professional?.status === 'Active'
+                    ).map(e => `${e.personal.firstName} ${e.personal.lastName}`);
+                    setDseList(dses);
+                }
+
+                // 3. If creating new, fetch challan to auto-fill data
                 if (!initialData && customer?.originalId) {
                     const challanRes = await fetch(`${API_URL}/challan/${customer.originalId}`, { headers: { 'Authorization': token } });
                     if (challanRes.ok) {
@@ -622,9 +635,9 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const landingPrice = safe(formData.model.landingPrice);
         const netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
         
-        // 8. TDS and Final Net Profit
-        const commission = safe(formData.dse.commission);
-        const tds = (commission * 0.05).toFixed(2);
+        // 8. TDS and Final Net Profit (Dependent on Deal Commission)
+        const dealCommission = safe(formData.dse.commission);
+        const tds = (dealCommission * 0.05).toFixed(2);
         const finalNetProfit = (safe(netProfit) - safe(tds)).toFixed(2);
         
         // Update State (Avoiding infinite loops by comparing values)
@@ -659,7 +672,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         formData.loan.processingFee, formData.loan.amount,
         formData.payment.paidAmount,
         formData.broker.amount, formData.other.amount,
-        formData.dse.commission,
+        formData.dse.commission, formData.dse.dseCommission,
         formData.model.landingPrice // Added landingPrice to dependencies
     ]);
 
@@ -851,9 +864,15 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="md:col-span-3">
                             <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DSE</label>
-                            <select value={formData.dse.name} onChange={e => handleDeepChange('dse', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">SELECT DSE</option><option value="Ashok Sah">Ashok Sah</option></select>
+                            <select value={formData.dse.name} onChange={e => handleDeepChange('dse', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}>
+                                <option value="">SELECT DSE</option>
+                                {dseList.map((name, i) => (
+                                    <option key={i} value={name}>{name}</option>
+                                ))}
+                            </select>
                           </div>
-                          <Input label="Commission" value={formData.dse.commission} onChange={v => handleDeepChange('dse', 'commission', v)} theme={theme} />
+                          <Input label="Deal Commission" value={formData.dse.commission} onChange={v => handleDeepChange('dse', 'commission', v)} theme={theme} />
+                          <Input label="DSE Payout (Commission)" value={formData.dse.dseCommission} onChange={v => handleDeepChange('dse', 'dseCommission', v)} theme={theme} />
                           <div className="space-y-1">
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Net Profit (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.dse.netProfit}</div>

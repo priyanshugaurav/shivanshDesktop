@@ -1,50 +1,61 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
     Search, Truck, FileText, CheckCircle2, 
     AlertCircle, User, Calendar, X,
     Filter, Hash, ShieldCheck, Clock, 
-    MoreHorizontal, ArrowRight, LayoutGrid
+    MoreHorizontal, ArrowRight, LayoutGrid, Loader2
 } from 'lucide-react';
 
 const AddVehicle = ({ theme: t }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedVehicle, setSelectedVehicle] = useState(null);
     const [filterMode, setFilterMode] = useState('all'); // 'all' | 'reg' | 'permit'
+    const [loading, setLoading] = useState(true);
+    const [vehicles, setVehicles] = useState([]);
     
     // Form States
     const [regInput, setRegInput] = useState('');
     const [permitInput, setPermitInput] = useState('');
     const [permitDate, setPermitDate] = useState('');
 
+    // --- FETCH REAL DATA ---
+    const fetchQueue = async () => {
+        setLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/agreements/registration-queue', {
+                headers: { 'Authorization': token }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                // Map backend fields to frontend names
+                const mapped = data.map(agg => ({
+                    id: agg._id,
+                    agreementId: agg.agreementId,
+                    customer: agg.customerId?.personal?.name || 'Unknown',
+                    model: agg.model?.name || 'N/A',
+                    date: new Date(agg.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+                    vehicleNo: agg.registrationNo || null,
+                    permitNo: agg.permitNo || null,
+                    chassis: agg.chassis || 'N/A'
+                }));
+                setVehicles(mapped);
+            }
+        } catch (error) {
+            console.error('Error fetching queue:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchQueue();
+    }, []);
+
     // --- THEME HELPERS ---
-    // Extracting color parts for dynamic styling
-    const themeColor = t.text.split('-')[1]; // e.g., 'emerald', 'blue'
+    const themeColor = t.text.split('-')[1]; 
     const activeBorder = `border-${themeColor}-500`;
     const activeRing = `focus:ring-${themeColor}-500`;
-
-    // --- MOCK DATA ---
-    const [vehicles, setVehicles] = useState([
-        { 
-            id: 'TMP-001', model: 'Rajhans Star', customer: 'Rahul Verma', date: '24 Jan',
-            vehicleNo: null, permitNo: null, color: 'Red', chassis: 'ME3...892'
-        },
-        { 
-            id: 'TMP-002', model: 'Rajhans Super', customer: 'Anita Singh', date: '20 Jan',
-            vehicleNo: 'HR02AB9988', permitNo: null, color: 'Blue', chassis: 'ME3...102'
-        },
-        { 
-            id: 'TMP-003', model: 'Rajhans Yodha', customer: 'Gurmeet P.', date: '18 Jan',
-            vehicleNo: null, permitNo: 'P-2026/8892', color: 'Green', chassis: 'ME3...555'
-        },
-        { 
-            id: 'TMP-004', model: 'Rajhans Plus', customer: 'Vikram S.', date: '15 Jan',
-            vehicleNo: null, permitNo: null, color: 'Grey', chassis: 'ME3...999'
-        },
-        { 
-            id: 'TMP-005', model: 'Rajhans Star', customer: 'Priya K.', date: '12 Jan',
-            vehicleNo: 'HR02XY1234', permitNo: 'P-2025/1122', color: 'Black', chassis: 'ME3...000'
-        },
-    ]);
 
     // --- FILTER LOGIC ---
     const filteredVehicles = useMemo(() => {
@@ -68,18 +79,50 @@ const AddVehicle = ({ theme: t }) => {
         setPermitDate('');
     };
 
-    const handleSaveReg = () => {
-        if (!regInput) return;
-        const updated = vehicles.map(v => v.id === selectedVehicle.id ? { ...v, vehicleNo: regInput } : v);
-        setVehicles(updated);
-        setSelectedVehicle({ ...selectedVehicle, vehicleNo: regInput });
+    const handleSaveReg = async () => {
+        if (!regInput || !selectedVehicle) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/agreement/${selectedVehicle.id}`, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': token,
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ registrationNo: regInput })
+            });
+
+            if (res.ok) {
+                const updated = vehicles.map(v => v.id === selectedVehicle.id ? { ...v, vehicleNo: regInput } : v);
+                setVehicles(updated);
+                setSelectedVehicle({ ...selectedVehicle, vehicleNo: regInput });
+            }
+        } catch (error) {
+            console.error('Save Reg error:', error);
+        }
     };
 
-    const handleSavePermit = () => {
-        if (!permitInput) return;
-        const updated = vehicles.map(v => v.id === selectedVehicle.id ? { ...v, permitNo: permitInput } : v);
-        setVehicles(updated);
-        setSelectedVehicle({ ...selectedVehicle, permitNo: permitInput });
+    const handleSavePermit = async () => {
+        if (!permitInput || !selectedVehicle) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/agreement/${selectedVehicle.id}`, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': token,
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ permitNo: permitInput })
+            });
+
+            if (res.ok) {
+                const updated = vehicles.map(v => v.id === selectedVehicle.id ? { ...v, permitNo: permitInput } : v);
+                setVehicles(updated);
+                setSelectedVehicle({ ...selectedVehicle, permitNo: permitInput });
+            }
+        } catch (error) {
+            console.error('Save Permit error:', error);
+        }
     };
 
     // Helper for Status Pills
@@ -88,6 +131,15 @@ const AddVehicle = ({ theme: t }) => {
         if (!v.vehicleNo || !v.permitNo) return 'bg-amber-500';
         return 'bg-emerald-500';
     };
+
+    if (loading && vehicles.length === 0) {
+        return (
+            <div className="w-full h-[680px] bg-white rounded-[1.5rem] flex flex-col items-center justify-center space-y-4">
+                 <Loader2 size={40} className={`animate-spin ${t.text}`} />
+                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Loading Registration Queue...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full h-[680px] bg-white rounded-[1.5rem] border border-slate-200 shadow-xl flex overflow-hidden font-sans text-slate-800">

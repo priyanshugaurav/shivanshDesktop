@@ -45,21 +45,117 @@ const Expense = ({ theme: t }) => {
 
     const years = [2024, 2025, 2026];
 
-    // --- MOCK DATA ---
-    const expenseData = [
-        { id: 'EXP-001', category: 'Rent', description: 'Showroom Rent', date: '01', amount: 45000, status: 'Paid', type: 'Fixed' },
-        { id: 'EXP-002', category: 'Utilities', description: 'Electricity Bill', date: '05', amount: 8500, status: 'Paid', type: 'Variable' },
-        { id: 'EXP-003', category: 'Salary', description: 'Staff Payroll (Auto)', date: '01', amount: 245000, status: 'Processed', type: 'Payroll' },
-        { id: 'EXP-004', category: 'Marketing', description: 'Facebook Ads', date: '10', amount: 12000, status: 'Pending', type: 'Variable' },
-        { id: 'EXP-005', category: 'Maintenance', description: 'AC Repair', date: '12', amount: 3500, status: 'Paid', type: 'Variable' },
-    ];
+    const [expenses, setExpenses] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [newExpense, setNewExpense] = useState({
+        amount: '',
+        category: 'Maintenance',
+        description: ''
+    });
 
-    const chartData = [
-        { name: 'Week 1', amount: 298500 }, // High due to rent/salary
-        { name: 'Week 2', amount: 15500 },
-        { name: 'Week 3', amount: 8200 },
-        { name: 'Week 4', amount: 12000 },
-    ];
+    // --- DATA FETCHING ---
+    const fetchExpenses = async () => {
+        setIsLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const monthName = months[selectedDate.month];
+            const res = await fetch(`/api/expenses?month=${monthName}&year=${selectedDate.year}`, {
+                headers: { 'Authorization': token }
+            });
+            const data = await res.json();
+            setExpenses(data);
+        } catch (error) {
+            console.error('Error fetching expenses:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchExpenses();
+    }, [selectedDate]);
+
+    // --- ACTIONS ---
+    const handleSaveExpense = async () => {
+        if (!newExpense.amount || !newExpense.description) return;
+        setIsLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/expenses', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token 
+                },
+                body: JSON.stringify({
+                    ...newExpense,
+                    month: months[selectedDate.month],
+                    year: selectedDate.year
+                })
+            });
+            if (res.ok) {
+                setNewExpense({ amount: '', category: 'Maintenance', description: '' });
+                fetchExpenses();
+            }
+        } catch (error) {
+            console.error('Error saving expense:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleDeleteExpense = async (id) => {
+        if (!window.confirm('Delete this expense?')) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/expenses/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': token }
+            });
+            if (res.ok) fetchExpenses();
+        } catch (error) {
+            console.error('Error deleting expense:', error);
+        }
+    };
+
+    // --- ANALYTICS ---
+    const totalSpend = Array.isArray(expenses) ? expenses.reduce((acc, curr) => acc + curr.amount, 0) : 0;
+    const payrollTotal = Array.isArray(expenses) ? expenses.filter(e => e.type === 'Payroll').reduce((acc, curr) => acc + curr.amount, 0) : 0;
+    
+    // Daily average based on days passed or full month
+    const daysInMonth = new Date(selectedDate.year, selectedDate.month + 1, 0).getDate();
+    const daysToCount = isCurrentPeriod ? today.getDate() : daysInMonth;
+    const dailyAvg = totalSpend / (daysToCount || 1);
+
+    // Chart Data (Grouped by Week)
+    const getChartData = () => {
+        const weeks = [
+            { name: 'Week 1', amount: 0 },
+            { name: 'Week 2', amount: 0 },
+            { name: 'Week 3', amount: 0 },
+            { name: 'Week 4', amount: 0 }
+        ];
+        if (Array.isArray(expenses)) {
+            expenses.forEach(exp => {
+                const weekIdx = Math.min(Math.floor((exp.date - 1) / 7), 3);
+                weeks[weekIdx].amount += exp.amount;
+            });
+        }
+        return weeks;
+    };
+    const chartData = getChartData();
+
+    // Category Splits for Progress Bars
+    const getSplits = () => {
+        if (!totalSpend || !Array.isArray(expenses)) return { payroll: 0, rent: 0, other: 0 };
+        const rent = expenses.filter(e => e.category === 'Rent & Lease').reduce((acc, curr) => acc + curr.amount, 0);
+        return {
+            payroll: Math.round((payrollTotal / totalSpend) * 100),
+            rent: Math.round((rent / totalSpend) * 100),
+            other: Math.round(((totalSpend - payrollTotal - rent) / totalSpend) * 100)
+        };
+    };
+    const splits = getSplits();
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20 font-sans text-slate-800">
@@ -127,7 +223,7 @@ const Expense = ({ theme: t }) => {
                             <Wallet size={18} />
                             <span className="text-xs font-bold uppercase tracking-widest">Total Spend</span>
                         </div>
-                        <p className="text-4xl font-black">₹ 3.14 L</p>
+                        <p className="text-4xl font-black">₹ {totalSpend.toLocaleString()}</p>
                         <p className="text-xs font-medium opacity-80 mt-2 flex items-center gap-1">
                             {months[selectedDate.month]} {selectedDate.year} Summary
                         </p>
@@ -139,7 +235,7 @@ const Expense = ({ theme: t }) => {
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Average</p>
-                            <p className="text-3xl font-black text-slate-800 mt-1">₹ 10,129</p>
+                            <p className="text-3xl font-black text-slate-800 mt-1">₹ {Math.round(dailyAvg).toLocaleString()}</p>
                         </div>
                         <div className={`p-2.5 rounded-xl ${t.light} ${t.text}`}>
                             <Activity size={20} />
@@ -165,7 +261,7 @@ const Expense = ({ theme: t }) => {
                     <div className="flex justify-between items-start relative z-10">
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payroll (Auto)</p>
-                            <p className="text-2xl font-black mt-1">₹ 2.45 L</p>
+                            <p className="text-2xl font-black mt-1">₹ {payrollTotal.toLocaleString()}</p>
                         </div>
                         <div className="p-2.5 bg-white/10 rounded-xl text-emerald-400">
                             <Briefcase size={20} />
@@ -229,44 +325,59 @@ const Expense = ({ theme: t }) => {
                                         <th className="py-4 px-6 text-[9px] font-bold uppercase text-slate-400 tracking-wider">Category</th>
                                         <th className="py-4 px-6 text-[9px] font-bold uppercase text-slate-400 tracking-wider">Date</th>
                                         <th className="py-4 px-6 text-[9px] font-bold uppercase text-slate-400 tracking-wider text-right">Amount</th>
-                                        <th className="py-4 px-6 text-[9px] font-bold uppercase text-slate-400 tracking-wider text-center">Status</th>
+                                        <th className="py-4 px-6 text-[9px] font-bold uppercase text-slate-400 tracking-wider text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {expenseData.map((exp, idx) => (
-                                        <tr key={idx} className="group hover:bg-slate-50/40 transition-colors">
-                                            <td className="py-4 px-6">
-                                                <p className="text-xs font-bold text-slate-900">{exp.description}</p>
-                                                <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{exp.id}</p>
-                                            </td>
-                                            <td className="py-4 px-6">
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wide border ${
-                                                    exp.category === 'Salary' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 
-                                                    exp.category === 'Rent' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                    'bg-slate-50 text-slate-600 border-slate-100'
-                                                }`}>
-                                                    {exp.category === 'Salary' && <User size={10}/>}
-                                                    {exp.category === 'Rent' && <Briefcase size={10}/>}
-                                                    {exp.category === 'Utilities' && <Zap size={10}/>}
-                                                    {exp.category}
-                                                </span>
-                                            </td>
-                                            <td className="py-4 px-6 text-xs font-medium text-slate-500">
-                                                {exp.date} {months[selectedDate.month].substring(0,3)}
-                                            </td>
-                                            <td className="py-4 px-6 text-right">
-                                                <span className="text-xs font-black text-slate-800">₹{exp.amount.toLocaleString()}</span>
-                                            </td>
-                                            <td className="py-4 px-6 text-center">
-                                                <span className={`inline-flex items-center gap-1 text-[9px] font-bold uppercase ${
-                                                    exp.status === 'Paid' || exp.status === 'Processed' ? 'text-emerald-500' : 'text-amber-500'
-                                                }`}>
-                                                    {exp.status === 'Pending' ? <Clock size={10}/> : <CheckCircle2 size={10}/>}
-                                                    {exp.status}
-                                                </span>
+                                    {expenses.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="5" className="py-20 text-center opacity-30">
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Receipt size={40} />
+                                                    <p className="text-xs font-bold uppercase tracking-widest">No Expenses Recorded</p>
+                                                </div>
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        expenses.map((exp, idx) => (
+                                            <tr key={idx} className="group hover:bg-slate-50/40 transition-colors">
+                                                <td className="py-4 px-6">
+                                                    <p className="text-xs font-bold text-slate-900">{exp.description}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{exp.id}</p>
+                                                </td>
+                                                <td className="py-4 px-6">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wide border ${
+                                                        exp.category === 'Salary' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 
+                                                        exp.category.includes('Rent') ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                        'bg-slate-50 text-slate-600 border-slate-100'
+                                                    }`}>
+                                                        {exp.category === 'Salary' && <User size={10}/>}
+                                                        {exp.category.includes('Rent') && <Briefcase size={10}/>}
+                                                        {exp.category.includes('Utilities') && <Zap size={10}/>}
+                                                        {exp.category}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-6 text-xs font-medium text-slate-500">
+                                                    {exp.date} {months[selectedDate.month].substring(0,3)}
+                                                </td>
+                                                <td className="py-4 px-6 text-right">
+                                                    <span className="text-xs font-black text-slate-800">₹{exp.amount.toLocaleString()}</span>
+                                                </td>
+                                                <td className="py-4 px-6 text-center">
+                                                    {exp.type === 'Manual' ? (
+                                                        <button 
+                                                            onClick={() => handleDeleteExpense(exp._id)}
+                                                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                                        >
+                                                            <Activity size={14} className="rotate-45" /> {/* Using Activity as a placeholder for trash for variety */}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Locked</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -293,6 +404,8 @@ const Expense = ({ theme: t }) => {
                                     <input 
                                         type="number" 
                                         placeholder="0.00"
+                                        value={newExpense.amount}
+                                        onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
                                         className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all"
                                     />
                                 </div>
@@ -300,8 +413,11 @@ const Expense = ({ theme: t }) => {
 
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">Category</label>
-                                <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all cursor-pointer">
-                                    <option>Select Category...</option>
+                                <select 
+                                    value={newExpense.category}
+                                    onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all cursor-pointer"
+                                >
                                     <option>Rent & Lease</option>
                                     <option>Utilities (Electricity/Water)</option>
                                     <option>Marketing & Ads</option>
@@ -317,12 +433,18 @@ const Expense = ({ theme: t }) => {
                                 <input 
                                     type="text" 
                                     placeholder="e.g. Office Snacks"
+                                    value={newExpense.description}
+                                    onChange={e => setNewExpense({...newExpense, description: e.target.value})}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all"
                                 />
                             </div>
 
-                            <button className={`w-full py-3.5 rounded-xl text-xs font-bold text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-wider mt-2 ${t.primary}`}>
-                                Save Expense
+                            <button 
+                                onClick={handleSaveExpense}
+                                disabled={isLoading}
+                                className={`w-full py-3.5 rounded-xl text-xs font-bold text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-wider mt-2 ${t.primary} ${isLoading ? 'opacity-50' : ''}`}
+                            >
+                                {isLoading ? 'Saving...' : 'Save Expense'}
                             </button>
                         </div>
                     </div>
@@ -337,28 +459,28 @@ const Expense = ({ theme: t }) => {
                             <div>
                                 <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
                                     <span>Payroll</span>
-                                    <span className="text-white">78%</span>
+                                    <span className="text-white">{splits.payroll}%</span>
                                 </div>
                                 <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-indigo-500 w-[78%] rounded-full"></div>
+                                    <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${splits.payroll}%` }}></div>
                                 </div>
                             </div>
                             <div>
                                 <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
                                     <span>Rent</span>
-                                    <span className="text-white">14%</span>
+                                    <span className="text-white">{splits.rent}%</span>
                                 </div>
                                 <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-amber-500 w-[14%] rounded-full"></div>
+                                    <div className="h-full bg-amber-500 rounded-full" style={{ width: `${splits.rent}%` }}></div>
                                 </div>
                             </div>
                             <div>
                                 <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1">
                                     <span>Ops</span>
-                                    <span className="text-white">8%</span>
+                                    <span className="text-white">{splits.other}%</span>
                                 </div>
                                 <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                                    <div className="h-full bg-rose-500 w-[8%] rounded-full"></div>
+                                    <div className="h-full bg-rose-500 rounded-full" style={{ width: `${splits.other}%` }}></div>
                                 </div>
                             </div>
                         </div>
