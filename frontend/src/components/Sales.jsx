@@ -524,36 +524,45 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             if (!token) return;
 
             try {
-                // 1. Fetch inventory models
+                // 1. Fetch inventory models (for the dropdown)
                 const invRes = await fetch(`${API_URL}/inventory`, { headers: { 'Authorization': token } });
                 if (invRes.ok) {
                     const invData = await invRes.json();
                     setStocks(invData);
+                }
 
-                    // 2. If creating new, fetch challan to auto-fill model
-                    if (!initialData && customer?.originalId) {
-                        const challanRes = await fetch(`${API_URL}/challan/${customer.originalId}`, { headers: { 'Authorization': token } });
-                        if (challanRes.ok) {
-                            const challanData = await challanRes.json();
-                            if (challanData.details?.model) {
-                                const modelName = challanData.details.model;
-                                const selectedModel = invData.find(s => s.modelName === modelName);
-                                if (selectedModel && selectedModel.pricing) {
-                                    setFormData(prev => ({
-                                        ...prev,
-                                        model: {
-                                            ...prev.model,
-                                            name: modelName,
-                                            exShowroom: selectedModel.pricing.exShowroom.toString(),
-                                            insurance: selectedModel.pricing.insurance.toString(),
-                                            rto: selectedModel.pricing.rto.toString(),
-                                            permit: selectedModel.pricing.permit.toString()
-                                        }
-                                    }));
-                                } else {
-                                    handleDeepChange('model', 'name', modelName);
-                                }
+                // 2. If creating new, fetch challan to auto-fill data
+                if (!initialData && customer?.originalId) {
+                    const challanRes = await fetch(`${API_URL}/challan/${customer.originalId}`, { headers: { 'Authorization': token } });
+                    if (challanRes.ok) {
+                        const challanData = await challanRes.json();
+                        
+                        // Try to fetch exact unit pricing by Chassis No (frameNo)
+                        if (challanData.engine?.frameNo) {
+                            const unitRes = await fetch(`${API_URL}/stocks/chassis/${challanData.engine.frameNo}`, { headers: { 'Authorization': token } });
+                            if (unitRes.ok) {
+                                const unitData = await unitRes.json();
+                                setFormData(prev => ({
+                                    ...prev,
+                                    model: {
+                                        ...prev.model,
+                                        name: unitData.modelId?.name || challanData.details?.model || '',
+                                        exShowroom: (unitData.exShowroom || 0).toString(),
+                                        insurance: (unitData.insurance || 0).toString(),
+                                        rto: (unitData.rto || 0).toString(),
+                                        permit: (unitData.permit || 0).toString()
+                                    }
+                                }));
+                                return; // Data filled, exit early
                             }
+                        }
+                        
+                        // Fallback: Just set the model name from Challan if no chassis found
+                        if (challanData.details?.model) {
+                            setFormData(prev => ({
+                                ...prev,
+                                model: { ...prev.model, name: challanData.details.model }
+                            }));
                         }
                     }
                 }
@@ -592,21 +601,20 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
 
     // Handle Model Selection Sync
     const onModelSelect = (modelName) => {
-        handleDeepChange('model', 'name', modelName);
-        const selectedModel = stocks.find(s => s.modelName === modelName);
-        if (selectedModel && selectedModel.pricing) {
-            setFormData(prev => ({
-                ...prev,
-                model: {
-                    ...prev.model,
-                    name: modelName,
-                    exShowroom: selectedModel.pricing.exShowroom.toString(),
-                    insurance: selectedModel.pricing.insurance.toString(),
-                    rto: selectedModel.pricing.rto.toString(),
-                    permit: selectedModel.pricing.permit.toString()
-                }
-            }));
-        }
+        // We can't auto-fill pricing purely based on Model Name anymore, 
+        // pricing depends on specific Chassis selection. 
+        // Reset prices to 0 to fill manually.
+        setFormData(prev => ({
+            ...prev,
+            model: {
+                ...prev.model,
+                name: modelName,
+                exShowroom: '0',
+                insurance: '0',
+                rto: '0',
+                permit: '0'
+            }
+        }));
     };
    
     const handleSubmit = async () => {

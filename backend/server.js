@@ -171,10 +171,6 @@ const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', Agree
 const VehicleModelSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true, trim: true }, // e.g., "Rajhans Star"
   type: { type: String, default: 'E-Rickshaw' },
-  exShowroom: { type: Number, default: 0 },
-  insurance: { type: Number, default: 0 },
-  rto: { type: Number, default: 0 },
-  permit: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });
 const VehicleModel = mongoose.models.VehicleModel || mongoose.model('VehicleModel', VehicleModelSchema);
@@ -194,6 +190,10 @@ const VehicleStockSchema = new mongoose.Schema({
   batteryNo: { type: String, trim: true },
 
   // Financials
+  exShowroom: { type: Number, default: 0 },
+  insurance: { type: Number, default: 0 },
+  rto: { type: Number, default: 0 },
+  permit: { type: Number, default: 0 },
   purchaseRate: { type: Number, default: 0 },
   hsn: { type: String, default: '' },
   
@@ -416,21 +416,48 @@ app.get('/api/models', verifyToken, async (req, res) => {
 // 2. Add New Model
 app.post('/api/models', verifyToken, async (req, res) => {
   try {
-    const { name, exShowroom, insurance, rto, permit } = req.body;
+    const { name, type } = req.body;
     const existing = await VehicleModel.findOne({ name });
     if (existing) return res.status(400).json({ message: 'Model already exists' });
 
     const newModel = await VehicleModel.create({ 
         name, 
-        exShowroom: Number(exShowroom) || 0,
-        insurance: Number(insurance) || 0,
-        rto: Number(rto) || 0,
-        permit: Number(permit) || 0
+        type: type || 'E-Rickshaw'
     });
     res.status(201).json(newModel);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// 2.1 Update Model
+app.put('/api/models/:id', verifyToken, async (req, res) => {
+    try {
+        const { name, type } = req.body;
+        const updated = await VehicleModel.findByIdAndUpdate(
+            req.params.id,
+            { name, type },
+            { new: true }
+        );
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 2.2 Delete Model (Only if no stock units exist)
+app.delete('/api/models/:id', verifyToken, async (req, res) => {
+    try {
+        // Security: Deleting a model requires checking if stock exists
+        const stockCount = await VehicleStock.countDocuments({ modelId: req.params.id });
+        if (stockCount > 0) {
+            return res.status(400).json({ message: `Cannot delete model. ${stockCount} units are still in stock.` });
+        }
+        await VehicleModel.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Model deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // 3. Get Stocks for a specific Model (Main Dashboard Table)
@@ -443,13 +470,27 @@ app.get('/api/stocks/:modelId', verifyToken, async (req, res) => {
   }
 });
 
+// 3.1 Get Stock by Chassis Number (For Agreement Auto-fill)
+app.get('/api/stocks/chassis/:chassisNo', verifyToken, async (req, res) => {
+    try {
+        const stock = await VehicleStock.findOne({ chassisNo: req.params.chassisNo }).populate('modelId');
+        if (!stock) {
+            return res.status(404).json({ message: 'Stock not found with this Chassis Number' });
+        }
+        res.json(stock);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // 4. Add Specific Stock Unit
 app.post('/api/stocks', verifyToken, async (req, res) => {
   try {
     const { 
       modelId, variant, voltage, 
       chassisNo, motorNo, batteryNo, color, 
-      purchaseRate, hsn 
+      purchaseRate, hsn,
+      exShowroom, insurance, rto, permit 
     } = req.body;
 
     const existingItem = await VehicleStock.findOne({ chassisNo });
@@ -458,15 +499,13 @@ app.post('/api/stocks', verifyToken, async (req, res) => {
     }
 
     const newStock = await VehicleStock.create({
-      modelId,
-      variant,
-      voltage,
-      chassisNo,
-      motorNo,
-      batteryNo,
-      color,
-      purchaseRate: Number(purchaseRate),
-      hsn
+      modelId, variant, voltage, chassisNo, motorNo, batteryNo, color,
+      purchaseRate: Number(purchaseRate) || 0,
+      hsn,
+      exShowroom: Number(exShowroom) || 0,
+      insurance: Number(insurance) || 0,
+      rto: Number(rto) || 0,
+      permit: Number(permit) || 0
     });
 
     res.status(201).json(newStock);
