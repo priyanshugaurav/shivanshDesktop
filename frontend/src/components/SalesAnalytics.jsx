@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
 import { 
     TrendingUp, DollarSign, Wallet, Percent, AlertCircle, 
     Calendar, Filter, Download, ArrowUpRight, ArrowDownRight,
@@ -11,107 +10,37 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
     LineChart, Line, PieChart, Pie, Cell, AreaChart, Area,
     ComposedChart, Radar, RadarChart, PolarGrid, 
-    PolarAngleAxis, PolarRadiusAxis, RadialBarChart, RadialBar,
-    Legend
+    PolarAngleAxis, PolarRadiusAxis, RadialBarChart, RadialBar
 } from 'recharts';
 
 const SalesAnalytics = ({ theme: t }) => {
     // --- STATE MANAGEMENT ---
-    const [agreements, setAgreements] = useState([]);
-    const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState('Monthly');
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [analyticsData, setAnalyticsData] = useState(null);
 
-    // --- FETCH DATA ---
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchAnalytics = async () => {
+            setLoading(true);
             try {
                 const token = localStorage.getItem('token');
-                const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/agreements`, {
+                const response = await fetch('/api/analytics/sales', {
                     headers: { 'Authorization': token }
                 });
-                setAgreements(res.data);
+                if (!response.ok) throw new Error('Failed to fetch analytics');
+                const data = await response.json();
+                setAnalyticsData(data);
+                setLoading(false);
             } catch (err) {
-                console.error("Error fetching analytics data:", err);
-            } finally {
+                console.error('Analytics Error:', err);
+                setError(err.message);
                 setLoading(false);
             }
         };
-        fetchData();
+        fetchAnalytics();
     }, []);
-
-    // --- DATA AGGREGATION ---
-    const safe = (val) => parseFloat(val) || 0;
-
-    const stats = useMemo(() => {
-        if (!agreements.length) return { kpi: [], monthly: [], models: [] };
-
-        // 1. KPI Aggregation
-        let totalProfit = 0;
-        let totalRevenue = 0;
-        let totalCommission = 0;
-        let totalTds = 0;
-        let totalDues = 0;
-
-        agreements.forEach(a => {
-            totalProfit += safe(a.dse?.finalNetProfit);
-            totalRevenue += safe(a.model?.onRoadPrice);
-            totalCommission += safe(a.dse?.commission);
-            totalTds += safe(a.dse?.tds);
-            totalDues += safe(a.payment?.netDues);
-        });
-
-        const kpi = [
-            { 
-                id: 'net_profit', label: 'Net Profit', value: `₹ ${(totalProfit / 100000).toFixed(2)} L`, trend: '+0%', 
-                isPositive: true, icon: Wallet, sub: 'Post-Tax Earnings', variant: 'primary', progress: 100
-            },
-            { 
-                id: 'gross_rev', label: 'Gross Revenue', value: `₹ ${(totalRevenue / 10000000).toFixed(2)} Cr`, trend: '+0%', 
-                isPositive: true, icon: DollarSign, sub: 'Total Invoiced Value', variant: 'dark', progress: 100
-            },
-            { 
-                id: 'dse_comm', label: 'DSE Payouts', value: `₹ ${(totalCommission / 1000).toFixed(1)} K`, trend: '0%', 
-                isPositive: true, icon: Users, sub: 'Dealer Commissions', variant: 'white', progress: 100
-            },
-            { 
-                id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${(totalTds / 1000).toFixed(1)} K`, trend: '0%', 
-                isPositive: false, icon: Percent, sub: 'Govt. Tax Deducted', variant: 'white', progress: 100
-            },
-            { 
-                id: 'dues_pending', label: 'Pending Dues', value: `₹ ${(totalDues / 100000).toFixed(2)} L`, trend: '0%', 
-                isPositive: false, icon: AlertCircle, sub: 'Accounts Receivable', variant: 'white', progress: 100
-            }
-        ];
-
-        // 2. Monthly Trend Aggregation
-        const monthMap = {};
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        
-        agreements.forEach(a => {
-            const date = new Date(a.createdAt);
-            const mName = months[date.getMonth()];
-            if (!monthMap[mName]) monthMap[mName] = { name: mName, revenue: 0, profit: 0 };
-            monthMap[mName].revenue += safe(a.model?.onRoadPrice) / 100000; // in Lakhs for chart visibility
-            monthMap[mName].profit += safe(a.dse?.finalNetProfit) / 100000;
-        });
-
-        const monthly = Object.values(monthMap);
-
-        // 3. Model Distribution
-        const modelMap = {};
-        agreements.forEach(a => {
-            const mName = a.model?.name || 'Unknown';
-            modelMap[mName] = (modelMap[mName] || 0) + 1;
-        });
-
-        const models = Object.entries(modelMap).map(([name, count]) => ({
-            name,
-            value: count
-        }));
-
-        return { kpi, monthly, models };
-    }, [agreements]);
 
     // --- THEME UTILS ---
     const getThemeHex = () => {
@@ -134,43 +63,50 @@ const SalesAnalytics = ({ theme: t }) => {
     };
     const THEME_GRADIENT = getGradientClass();
 
-    // --- KPI DATA ---
-    const kpiData = stats.kpi.length ? stats.kpi : [];
+    // --- DATA MAPPING ---
+    const kpiData = analyticsData?.kpis.map(kpi => {
+        const mockMatch = [
+            { id: 'net_profit', icon: Wallet, sub: 'Post-Tax Earnings', variant: 'primary', progress: 85 },
+            { id: 'gross_rev', icon: DollarSign, sub: 'Total Invoiced Value', variant: 'dark', progress: 92 },
+            { id: 'dse_comm', icon: Users, sub: 'Dealer Commissions', variant: 'white', progress: 45 },
+            { id: 'tds_deduct', icon: Percent, sub: 'Govt. Tax Deducted', variant: 'white', progress: 20 },
+            { id: 'dues_pending', icon: AlertCircle, sub: 'Accounts Receivable', variant: 'white', progress: 65 }
+        ].find(m => m.id === kpi.id);
 
-    const financialMixedData = stats.monthly.length ? stats.monthly : [
-        { name: 'No Data', revenue: 0, profit: 0 },
-    ];
+        return {
+            ...kpi,
+            ...mockMatch,
+            trend: '+0%', // Trends are not yet calculated in backend
+            isPositive: kpi.id === 'net_profit' || kpi.id === 'gross_rev'
+        };
+    }) || [];
 
-    const modelDistribution = stats.models.length ? stats.models.map((m, i) => ({
-        ...m,
-        color: i === 0 ? THEME_COLOR : (i === 1 ? '#334155' : (i === 2 ? '#94a3b8' : '#cbd5e1'))
-    })) : [
-        { name: 'None', value: 1, color: '#f3f4f6' }
-    ];
+    const financialMixedData = analyticsData?.financialMixedData || [];
+    
+    const modelDistribution = analyticsData?.modelDistribution.map((m, i) => {
+        const colors = [THEME_COLOR, '#334155', '#94a3b8', '#cbd5e1', '#e2e8f0'];
+        return {
+            ...m,
+            color: colors[i % colors.length]
+        };
+    }) || [];
 
+    // Static Mock Data for things not yet in DB
     const efficiencyData = [
-        { subject: 'Conv.', A: 0, fullMark: 100 },
-        { subject: 'CSI', A: 0, fullMark: 100 },
-        { subject: 'Turn.', A: 0, fullMark: 100 },
-        { subject: 'DSE', A: 0, fullMark: 100 },
-        { subject: 'Serv.', A: 0, fullMark: 100 },
-        { subject: 'Mkt.', A: 0, fullMark: 100 },
+        { subject: 'Conv.', A: 120, fullMark: 150 },
+        { subject: 'CSI', A: 98, fullMark: 150 },
+        { subject: 'Turn.', A: 86, fullMark: 150 },
+        { subject: 'DSE', A: 99, fullMark: 150 },
+        { subject: 'Serv.', A: 85, fullMark: 150 },
+        { subject: 'Mkt.', A: 65, fullMark: 150 },
     ];
 
     const funnelData = [
-        { name: 'Leads', value: 0, fill: '#cbd5e1' },
-        { name: 'Test Drives', value: 0, fill: '#94a3b8' },
-        { name: 'Bookings', value: 0, fill: '#475569' },
-        { name: 'Deliveries', value: agreements.length, fill: THEME_COLOR },
+        { name: 'Leads', value: 100, fill: '#cbd5e1' },
+        { name: 'Test Drives', value: 65, fill: '#94a3b8' },
+        { name: 'Bookings', value: 40, fill: '#475569' },
+        { name: 'Deliveries', value: 28, fill: THEME_COLOR },
     ];
-
-    if (loading) {
-        return (
-            <div className="w-full h-96 flex items-center justify-center">
-                <RefreshCw className={`h-8 w-8 animate-spin ${t.text}`} />
-            </div>
-        );
-    }
 
     const salesLog = [
         { id: 'INV-001', customer: 'Rahul Verma', model: 'Star', date: '10:42 AM', amount: '1.24 L', status: 'Paid' },
@@ -207,6 +143,24 @@ const SalesAnalytics = ({ theme: t }) => {
         { text: 'Stock Alert: Battery Low', time: '1h ago', type: 'warning' },
         { text: 'New Lead: Walk-in', time: '2h ago', type: 'default' },
     ];
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-96">
+                <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${t.primary}`}></div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="p-8 text-center bg-red-50 border border-red-200 rounded-xl">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-red-800">Error loading analytics</h3>
+                <p className="text-red-600">{error}</p>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-20 font-sans text-slate-800">

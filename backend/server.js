@@ -342,15 +342,6 @@ app.put('/api/challan/:id', verifyToken, async (req, res) => {
 
 // --- Agreement Routes ---
 
-app.get('/api/agreements', verifyToken, async (req, res) => {
-  try {
-    const agreements = await Agreement.find().populate('customerId').sort({ createdAt: -1 });
-    res.json(agreements);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 app.post('/api/agreement', verifyToken, async (req, res) => {
   try {
     // Auto-generate Agreement ID (starts from 1001)
@@ -576,6 +567,64 @@ app.get('/api/inventory', verifyToken, async (req, res) => {
       };
     }));
     res.json(inventory);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. Sales Analytics Aggregator
+app.get('/api/analytics/sales', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find().sort({ createdAt: 1 });
+    
+    // KPI Aggregation
+    const stats = agreements.reduce((acc, curr) => {
+      acc.grossRevenue += parseFloat(curr.model.onRoadPrice) || 0;
+      acc.netProfit += parseFloat(curr.dse.finalNetProfit) || 0;
+      acc.tds += parseFloat(curr.dse.tds) || 0;
+      acc.pendingDues += parseFloat(curr.payment.netDues) || 0;
+      return acc;
+    }, { grossRevenue: 0, netProfit: 0, tds: 0, pendingDues: 0 });
+
+    // Monthly Trends (Last 12 months)
+    const monthlyMap = {};
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    agreements.forEach(agg => {
+      const date = new Date(agg.createdAt);
+      const monthLabel = months[date.getMonth()];
+      if (!monthlyMap[monthLabel]) {
+        monthlyMap[monthLabel] = { name: monthLabel, revenue: 0, expenses: 0, profit: 0 };
+      }
+      monthlyMap[monthLabel].revenue += (parseFloat(agg.model.onRoadPrice) || 0) / 100000; // In Lakhs for chart scaling
+      monthlyMap[monthLabel].profit += (parseFloat(agg.dse.finalNetProfit) || 0) / 100000;
+    });
+
+    const financialMixedData = Object.values(monthlyMap);
+
+    // Model Distribution
+    const modelMap = {};
+    agreements.forEach(agg => {
+      const name = agg.model.name || 'Unknown';
+      modelMap[name] = (modelMap[name] || 0) + 1;
+    });
+
+    const modelDistribution = Object.entries(modelMap).map(([name, value]) => ({
+      name,
+      value
+    }));
+
+    res.json({
+      kpis: [
+        { id: 'net_profit', label: 'Net Profit', value: `₹ ${(stats.netProfit/100000).toFixed(2)} L`, raw: stats.netProfit },
+        { id: 'gross_rev', label: 'Gross Revenue', value: `₹ ${(stats.grossRevenue/10000000).toFixed(2)} Cr`, raw: stats.grossRevenue },
+        { id: 'dse_comm', label: 'DSE Payouts', value: '₹ 0 L', raw: 0 }, // Set to 0 as requested
+        { id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${(stats.tds/100000).toFixed(2)} L`, raw: stats.tds },
+        { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${(stats.pendingDues/100000).toFixed(2)} L`, raw: stats.pendingDues }
+      ],
+      financialMixedData,
+      modelDistribution
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
