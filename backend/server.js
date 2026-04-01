@@ -638,12 +638,35 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
         revenue: `₹ ${formatter.format(d.revenue || 0)}`
     }));
 
-    // Recent Activity Feed
-    const recentActivity = agreements.slice(-4).reverse().map(agg => ({
-        text: `New Agreement: ${agg.model.name}`,
-        time: new Date(agg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    // --- 0. Enhanced Floor Activity (Leads, Bookings, Sales combined) ---
+    const [recentLeads, recentBookings, recentAgreements] = await Promise.all([
+      Customer.find().sort({ createdAt: -1 }).limit(5),
+      Challan.find().sort({ createdAt: -1 }).limit(5).populate('customer'),
+      Agreement.find().sort({ createdAt: -1 }).limit(5).populate('customerId')
+    ]);
+
+    const activityFeed = [
+      ...recentLeads.map(l => ({
+        text: `New Lead: ${l.personal.firstName} ${l.personal.lastName}`,
+        time: l.createdAt,
+        type: 'info'
+      })),
+      ...recentBookings.map(b => ({
+        text: `New Booking: ${b.customer?.personal.firstName || 'Customer'} (${b.details.model})`,
+        time: b.createdAt,
+        type: 'warning'
+      })),
+      ...recentAgreements.map(a => ({
+        text: `New Sale: ${a.customerId?.personal.firstName || 'Customer'} (${a.model.name})`,
+        time: a.createdAt,
         type: 'success'
+      }))
+    ].sort((a, b) => b.time - a.time).slice(0, 10).map(act => ({
+      ...act,
+      time: new Date(act.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }));
+
+    const recentActivity = activityFeed;
 
     // --- 1. Conversion Funnel (Leads -> Bookings -> Deliveries) ---
     const [leadsCount, bookingsCount, deliveriesCount] = await Promise.all([
