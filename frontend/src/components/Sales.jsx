@@ -490,7 +490,7 @@ const Input = ({ label, value, onChange, type="text", prefix, theme }) => (
             {prefix && <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">{prefix}</span>}
             <input 
                 type={type} 
-                value={value} 
+                value={value ?? ''} 
                 onChange={e => onChange(e.target.value)} 
                 className={`w-full ${prefix ? 'pl-7' : 'px-3'} py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-transparent focus:ring-1 ${theme?.ring} outline-none transition-all`} 
             />
@@ -626,6 +626,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
         
         // 8. TDS and Final Net Profit
+        const commission = safe(formData.dse.commission);
         const tds = (commission * 0.05).toFixed(2);
         const finalNetProfit = (safe(netProfit) - safe(tds)).toFixed(2);
         
