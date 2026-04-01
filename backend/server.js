@@ -552,15 +552,17 @@ app.get('/api/inventory', verifyToken, async (req, res) => {
       // Extract unique colors from stock units
       const uniqueColors = [...new Set(stocks.map(s => s.color).filter(c => c))];
       
+      const firstStock = stocks[0] || {};
+      
       return {
         _id: model._id,
         modelName: model.name, // Maps to 'modelName' context in Sales.jsx
         colors: uniqueColors,
         pricing: {
-            exShowroom: model.exShowroom || 0,
-            insurance: model.insurance || 0,
-            rto: model.rto || 0,
-            permit: model.permit || 0
+            exShowroom: firstStock.exShowroom || 0,
+            insurance: firstStock.insurance || 0,
+            rto: firstStock.rto || 0,
+            permit: firstStock.permit || 0
         }
       };
     }));

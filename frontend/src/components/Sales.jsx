@@ -601,20 +601,32 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
 
     // Handle Model Selection Sync
     const onModelSelect = (modelName) => {
-        // We can't auto-fill pricing purely based on Model Name anymore, 
-        // pricing depends on specific Chassis selection. 
-        // Reset prices to 0 to fill manually.
-        setFormData(prev => ({
-            ...prev,
-            model: {
-                ...prev.model,
-                name: modelName,
-                exShowroom: '0',
-                insurance: '0',
-                rto: '0',
-                permit: '0'
-            }
-        }));
+        // Find metadata from available inventory
+        const selectedModel = stocks.find(s => s.modelName === modelName);
+        
+        if (selectedModel && selectedModel.pricing) {
+            setFormData(prev => ({
+                ...prev,
+                model: {
+                    ...prev.model,
+                    name: modelName,
+                    exShowroom: (selectedModel.pricing.exShowroom || 0).toString(),
+                    insurance: (selectedModel.pricing.insurance || 0).toString(),
+                    rto: (selectedModel.pricing.rto || 0).toString(),
+                    permit: (selectedModel.pricing.permit || 0).toString()
+                }
+            }));
+        } else {
+            // Default 0 if no stock found for this model
+            setFormData(prev => ({
+                ...prev,
+                model: {
+                    ...prev.model,
+                    name: modelName,
+                    exShowroom: '0', insurance: '0', rto: '0', permit: '0'
+                }
+            }));
+        }
     };
    
     const handleSubmit = async () => {
