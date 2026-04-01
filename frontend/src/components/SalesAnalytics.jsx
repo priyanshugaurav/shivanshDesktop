@@ -91,6 +91,9 @@ const SalesAnalytics = ({ theme: t }) => {
         };
     }) || [];
 
+    const salesLog = analyticsData?.recentSales || [];
+    const dsePerformance = analyticsData?.dsePerformance || [];
+
     // Static Mock Data for things not yet in DB
     const efficiencyData = [
         { subject: 'Conv.', A: 120, fullMark: 150 },
@@ -106,19 +109,6 @@ const SalesAnalytics = ({ theme: t }) => {
         { name: 'Test Drives', value: 65, fill: '#94a3b8' },
         { name: 'Bookings', value: 40, fill: '#475569' },
         { name: 'Deliveries', value: 28, fill: THEME_COLOR },
-    ];
-
-    const salesLog = [
-        { id: 'INV-001', customer: 'Rahul Verma', model: 'Star', date: '10:42 AM', amount: '1.24 L', status: 'Paid' },
-        { id: 'INV-002', customer: 'Priya Singh', model: 'Super', date: '09:15 AM', amount: '1.35 L', status: 'Pending' },
-        { id: 'INV-003', customer: 'Gurmeet S.', model: 'Yodha', date: 'Yesterday', amount: '1.50 L', status: 'Paid' },
-        { id: 'INV-004', customer: 'Md. Altaf', model: 'Star', date: 'Yesterday', amount: '1.24 L', status: 'Overdue' },
-    ];
-
-    const dsePerformance = [
-        { name: 'Amit Sharma', leads: 45, closed: 12, revenue: '15.4 L' },
-        { name: 'Vikram R.', leads: 38, closed: 9, revenue: '11.2 L' },
-        { name: 'Suresh K.', leads: 52, closed: 8, revenue: '9.8 L' },
     ];
 
     const heatmapData = [
@@ -137,12 +127,7 @@ const SalesAnalytics = ({ theme: t }) => {
         { name: 'Order', uv: 15.69, fill: THEME_COLOR },
     ];
 
-    const recentActivity = [
-        { text: 'New Booking: Rajhans Star', time: '2m ago', type: 'success' },
-        { text: 'Payment Received: ₹50k', time: '15m ago', type: 'info' },
-        { text: 'Stock Alert: Battery Low', time: '1h ago', type: 'warning' },
-        { text: 'New Lead: Walk-in', time: '2h ago', type: 'default' },
-    ];
+    const recentActivity = analyticsData?.recentActivity || [];
 
     if (loading) {
         return (

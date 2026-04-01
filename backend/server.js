@@ -614,16 +614,49 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       value
     }));
 
+    // Recent Sales Log
+    const recentSales = agreements.slice(-5).reverse().map(agg => ({
+        id: agg.agreementId || agg._id.toString().slice(-6),
+        customer: 'Customer', // Would need populate if we had name here, otherwise placeholder
+        model: agg.model.name,
+        date: new Date(agg.createdAt).toLocaleDateString(),
+        amount: `₹ ${(parseFloat(agg.model.onRoadPrice)/100000).toFixed(2)} L`,
+        status: parseFloat(agg.payment.netDues) <= 0 ? 'Paid' : 'Pending'
+    }));
+
+    // DSE Performance
+    const dseMap = {};
+    agreements.forEach(agg => {
+        const name = agg.dse.name || 'Unassigned';
+        if (!dseMap[name]) dseMap[name] = { name, leads: 0, closed: 0, revenue: 0 };
+        dseMap[name].closed += 1;
+        dseMap[name].revenue += parseFloat(agg.model.onRoadPrice) || 0;
+    });
+    const dsePerformance = Object.values(dseMap).map(d => ({
+        ...d,
+        revenue: `₹ ${(d.revenue/100000).toFixed(2)} L`
+    }));
+
+    // Recent Activity Feed
+    const recentActivity = agreements.slice(-4).reverse().map(agg => ({
+        text: `New Agreement: ${agg.model.name}`,
+        time: new Date(agg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: 'success'
+    }));
+
     res.json({
       kpis: [
         { id: 'net_profit', label: 'Net Profit', value: `₹ ${(stats.netProfit/100000).toFixed(2)} L`, raw: stats.netProfit },
         { id: 'gross_rev', label: 'Gross Revenue', value: `₹ ${(stats.grossRevenue/10000000).toFixed(2)} Cr`, raw: stats.grossRevenue },
-        { id: 'dse_comm', label: 'DSE Payouts', value: '₹ 0 L', raw: 0 }, // Set to 0 as requested
+        { id: 'dse_comm', label: 'DSE Payouts', value: '₹ 0 L', raw: 0 }, 
         { id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${(stats.tds/100000).toFixed(2)} L`, raw: stats.tds },
         { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${(stats.pendingDues/100000).toFixed(2)} L`, raw: stats.pendingDues }
       ],
       financialMixedData,
-      modelDistribution
+      modelDistribution,
+      recentSales,
+      dsePerformance,
+      recentActivity
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
