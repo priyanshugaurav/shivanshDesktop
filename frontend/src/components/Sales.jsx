@@ -611,6 +611,55 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         }
     }, [formData.dto.permit, formData.dto.registration, formData.dto.onlinePayment]);
 
+    // Auto-calculate Customer Down Payment
+    useEffect(() => {
+        const onRoad = parseFloat(formData.model.onRoadPrice) || 0;
+        const loan = parseFloat(formData.loan.amount) || 0;
+        const processing = parseFloat(formData.loan.processingFee) || 0;
+        const dtoTotal = parseFloat(formData.dto.total) || 0;
+        const broker = parseFloat(formData.broker.amount) || 0;
+        const other = parseFloat(formData.other.amount) || 0;
+        
+        const total = (onRoad + loan + processing + dtoTotal + broker + other).toFixed(2);
+        
+        if (formData.payment.downPayment !== total) {
+            handleDeepChange('payment', 'downPayment', total);
+        }
+    }, [
+        formData.model.onRoadPrice, 
+        formData.loan.amount, 
+        formData.loan.processingFee, 
+        formData.dto.total, 
+        formData.broker.amount, 
+        formData.other.amount
+    ]);
+
+    // Auto-calculate Dues
+    useEffect(() => {
+        const dp = parseFloat(formData.payment.downPayment) || 0;
+        const paid = parseFloat(formData.payment.paidAmount) || 0;
+        const calculatedDues = (dp - paid).toFixed(2);
+        
+        if (formData.payment.dues !== calculatedDues) {
+            // Check if we also need to update Net Dues (auto-sync only if they were already equal)
+            const shouldSyncNet = !initialData || formData.payment.netDues === formData.payment.dues;
+            
+            setFormData(prev => {
+                const next = {
+                    ...prev,
+                    payment: { 
+                        ...prev.payment, 
+                        dues: calculatedDues
+                    }
+                };
+                if (shouldSyncNet) {
+                    next.payment.netDues = calculatedDues;
+                }
+                return next;
+            });
+        }
+    }, [formData.payment.downPayment, formData.payment.paidAmount]);
+
     // Handle Model Selection Sync
     const onModelSelect = (modelName) => {
         // Find metadata from available inventory
@@ -773,11 +822,17 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                   <div>
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Calculator className="h-4 w-4 text-slate-400" /> Payment</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
-                          <Input label="Customer Down Payment" value={formData.payment.downPayment} onChange={v => handleDeepChange('payment', 'downPayment', v)} theme={theme} />
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Customer Down Payment (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.downPayment}</div>
+                          </div>
                           <Input label="Customer Paid Amount" value={formData.payment.paidAmount} onChange={v => handleDeepChange('payment', 'paidAmount', v)} theme={theme} />
                           <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Payment Type</label><select value={formData.payment.type} onChange={e => handleDeepChange('payment', 'type', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option>CASH</option><option>ONLINE</option><option>CHEQUE</option></select></div>
                           <Input label="Payment Date" type="date" value={formData.payment.date} onChange={v => handleDeepChange('payment', 'date', v)} theme={theme} />
-                          <Input label="Dues" value={formData.payment.dues} onChange={v => handleDeepChange('payment', 'dues', v)} theme={theme} />
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Dues (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.dues}</div>
+                          </div>
                           <Input label="Net Dues Remaining" value={formData.payment.netDues} onChange={v => handleDeepChange('payment', 'netDues', v)} theme={theme} />
                       </div>
                   </div>
