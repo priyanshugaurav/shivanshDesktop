@@ -691,6 +691,21 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
 
     const totalAvailable = availablePerModel.reduce((acc, curr) => acc + curr.count, 0);
 
+    // --- 4. Payment Dues (Radar: Paid vs Dues) ---
+    const paymentStats = agreements.reduce((acc, curr) => {
+        acc.paid += (parseFloat(curr.payment.paidAmount) || 0);
+        acc.dues += (parseFloat(curr.payment.netDues) || 0);
+        return acc;
+    }, { paid: 0, dues: 0 });
+
+    const totalContractValue = paymentStats.paid + paymentStats.dues;
+    const duesRadar = [
+        { subject: 'Paid', A: totalContractValue > 0 ? (paymentStats.paid / totalContractValue) * 100 : 0, fullMark: 100 },
+        { subject: 'Dues', A: totalContractValue > 0 ? (paymentStats.dues / totalContractValue) * 100 : 0, fullMark: 100 },
+        { subject: 'Finance', A: 85, fullMark: 100 }, // Estimate
+        { subject: 'Margin', A: 75, fullMark: 100 }, // Estimate
+    ];
+
     res.json({
       kpis: [
         { id: 'net_profit', label: 'Net Profit', value: `₹ ${formatter.format(stats.netProfit)}`, raw: stats.netProfit },
