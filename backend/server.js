@@ -336,7 +336,7 @@ app.put('/api/challan/:id', verifyToken, async (req, res) => {
     );
     res.json(updatedChallan);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -364,7 +364,7 @@ app.post('/api/agreement', verifyToken, async (req, res) => {
     await Customer.findByIdAndUpdate(req.body.customerId, { $set: { 'pipeline.agreement': true } });
     res.status(201).json(newAgreement);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -374,7 +374,7 @@ app.get('/api/agreement/:customerId', verifyToken, async (req, res) => {
     if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
     res.json(agreement);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -387,7 +387,7 @@ app.put('/api/agreement/:id', verifyToken, async (req, res) => {
     );
     res.json(updatedAgreement);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 

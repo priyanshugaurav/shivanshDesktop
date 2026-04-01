@@ -716,7 +716,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         });
         
         if (res.ok) { onSuccess(); } 
-        else { const err = await res.json(); alert(`Failed: ${err.message}`); }
+        else { 
+            const err = await res.json(); 
+            const msg = err.message || err.error || 'Unknown server error';
+            alert(`Failed: ${msg}`); 
+        }
       } catch (error) { console.error(error); } 
       finally { setLoading(false); }
     };
