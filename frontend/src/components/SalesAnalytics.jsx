@@ -94,13 +94,11 @@ const SalesAnalytics = ({ theme: t }) => {
     const salesLog = analyticsData?.recentSales || [];
     const dsePerformance = analyticsData?.dsePerformance || [];
 
-    const efficiencyData = analyticsData?.efficiencyData || [
-        { subject: 'Conv.', A: 120, fullMark: 150 },
-        { subject: 'CSI', A: 98, fullMark: 150 },
-        { subject: 'Turn.', A: 86, fullMark: 150 },
-        { subject: 'DSE', A: 99, fullMark: 150 },
-        { subject: 'Serv.', A: 85, fullMark: 150 },
-        { subject: 'Mkt.', A: 65, fullMark: 150 },
+    const efficiencyData = analyticsData?.duesRadar || [
+        { subject: 'Paid', A: 80, fullMark: 100 },
+        { subject: 'Dues', A: 20, fullMark: 100 },
+        { subject: 'Finance', A: 70, fullMark: 100 },
+        { subject: 'Margin', A: 60, fullMark: 100 },
     ];
 
     const rawFunnel = (analyticsData?.funnelData || []);
@@ -111,18 +109,11 @@ const SalesAnalytics = ({ theme: t }) => {
         fill: f.fill === 'THEME_COLOR' ? THEME_COLOR : f.fill
     }));
 
-    const heatmapData = analyticsData?.heatmapData || [
-        { day: 'Mon', hours: [1, 2, 4, 3, 2, 1] },
-        { day: 'Tue', hours: [2, 3, 4, 4, 3, 2] },
-        { day: 'Wed', hours: [1, 2, 3, 2, 2, 1] },
-        { day: 'Thu', hours: [2, 3, 4, 3, 2, 2] },
-        { day: 'Fri', hours: [3, 4, 4, 4, 3, 2] },
-        { day: 'Sat', hours: [4, 4, 4, 4, 4, 3] },
-        { day: 'Sun', hours: [1, 1, 2, 2, 1, 1] },
-    ];
+    const brokerData = analyticsData?.brokerData || [];
 
-    const inventoryData = (analyticsData?.inventoryData || []).map(i => ({
+    const inventoryData = (analyticsData?.stockData || []).map(i => ({
         ...i,
+        uv: i.uv,
         fill: i.fill === 'THEME_COLOR' ? THEME_COLOR : i.fill
     }));
 
@@ -363,16 +354,16 @@ const SalesAnalytics = ({ theme: t }) => {
                     <div className="bg-slate-900 p-5 rounded-[1.5rem] shadow-lg flex-1 text-white relative overflow-hidden flex flex-col">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
                         <div className="flex justify-between items-center mb-2 relative z-10">
-                            <h3 className="text-xs font-bold">Efficiency Score</h3>
-                            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full font-bold">A+</span>
+                            <h3 className="text-xs font-bold">Portfolio Mix</h3>
+                            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full font-bold">Live</span>
                         </div>
                         <div className="flex-1 min-h-[140px] w-full relative z-10">
                             <ResponsiveContainer width="100%" height="100%">
                                 <RadarChart cx="50%" cy="50%" outerRadius="65%" data={efficiencyData}>
                                     <PolarGrid stroke="#334155" />
                                     <PolarAngleAxis dataKey="subject" tick={{ fill: '#94a3b8', fontSize: 8, fontWeight: 'bold' }} />
-                                    <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
-                                    <Radar name="Showroom" dataKey="A" stroke={THEME_COLOR} strokeWidth={2} fill={THEME_COLOR} fillOpacity={0.4} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                    <Radar name="Portfolio" dataKey="A" stroke={THEME_COLOR} strokeWidth={2} fill={THEME_COLOR} fillOpacity={0.4} />
                                 </RadarChart>
                             </ResponsiveContainer>
                         </div>
@@ -451,41 +442,33 @@ const SalesAnalytics = ({ theme: t }) => {
                         ))}
                     </div>
                 </div>
-
-                {/* 3. Heatmap & Small Stats */}
+                {/* 3. Broker Rankings & Stock Availability */}
                 <div className="flex flex-col gap-4">
-                    {/* Heatmap */}
+                    {/* Broker Rankings */}
                     <div className="bg-white p-5 rounded-[1.5rem] border border-slate-200/60 shadow-sm flex-1">
                         <div className="flex justify-between items-center mb-3">
-                             <h3 className="text-xs font-bold text-slate-900">Sales Intensity</h3>
-                             <div className="flex gap-0.5">
-                                 {[1,2,3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-sm ${t.primary} opacity-${i*30}`}></div>)}
-                             </div>
+                             <h3 className="text-xs font-bold text-slate-900">Top Brokers</h3>
+                             <Users size={14} className="text-slate-400" />
                         </div>
-                        <div className="grid grid-cols-7 gap-1">
-                            {heatmapData.map(day => (
-                                <div key={day.day} className="text-center group">
-                                    <div className="space-y-1">
-                                        {day.hours.map((intensity, i) => (
-                                            <div 
-                                                key={i} 
-                                                className={`h-4 rounded-[2px] w-full transition-all group-hover:scale-x-110 ${
-                                                    intensity === 1 ? 'bg-slate-100' : 
-                                                    intensity === 2 ? `${t.primary} opacity-30` : 
-                                                    intensity === 3 ? `${t.primary} opacity-60` : t.primary
-                                                }`}
-                                            ></div>
-                                        ))}
+                        <div className="space-y-2">
+                            {brokerData.length > 0 ? brokerData.map((broker, i) => (
+                                <div key={i} className="flex items-center justify-between group">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${t.primary} opacity-${100 - (i*10)}`}></div>
+                                        <span className="text-[10px] font-bold text-slate-600 truncate max-w-[100px]">{broker.name}</span>
                                     </div>
-                                    <span className="text-[8px] font-bold text-slate-300 uppercase mt-1 block group-hover:text-slate-500">{day.day.charAt(0)}</span>
+                                    <span className="text-[10px] font-black text-slate-900 bg-slate-50 px-2 py-0.5 rounded-md">{broker.count}</span>
                                 </div>
-                            ))}
+                            )) : (
+                                <div className="text-[10px] text-slate-400 text-center py-8 italic">No broker data yet</div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Compact Inventory Stat */}
+                    {/* Stock Availability Stat */}
                     <div className="bg-slate-900 p-5 rounded-[1.5rem] shadow-lg text-white relative overflow-hidden flex flex-col justify-center items-center h-[120px]">
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 absolute top-4 left-4">Stock Health</h3>
+                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 absolute top-4 left-4">Stock Status</h3>
+
                         <div className="w-full h-[120px] mt-2">
                             <ResponsiveContainer width="100%" height="100%">
                                 <RadialBarChart cx="50%" cy="50%" innerRadius="40%" outerRadius="100%" barSize={6} data={inventoryData}>
@@ -494,8 +477,8 @@ const SalesAnalytics = ({ theme: t }) => {
                             </ResponsiveContainer>
                         </div>
                         <div className="absolute bottom-4 text-center">
-                             <span className="text-xl font-black">{analyticsData?.turnoverPct || 0}%</span>
-                             <span className="text-[8px] block text-slate-400 uppercase">Availability</span>
+                             <span className="text-xl font-black">{analyticsData?.availabilityPct || 0}%</span>
+                             <span className="text-[8px] block text-slate-400 uppercase">Available</span>
                         </div>
                     </div>
                 </div>

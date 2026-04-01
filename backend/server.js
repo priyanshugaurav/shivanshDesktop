@@ -658,32 +658,18 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       { name: 'Agreement', value: deliveriesCount, fill: 'THEME_COLOR' }
     ];
 
-    // --- 2. Sales Intensity Heatmap (Agreements by Day & Hour) ---
-    const heatmapResults = await Agreement.aggregate([
-      {
-        $project: {
-          day: { $dayOfWeek: "$createdAt" },
-          hour: { $hour: "$createdAt" }
-        }
-      },
-      {
-        $group: {
-          _id: { day: "$day", hour: { $floor: { $divide: ["$hour", 4] } } }, // Group by 4-hour blocks
-          count: { $sum: 1 }
-        }
-      }
+    // --- 2. Broker Leaderboard (New: Matches Heatmap replacement) ---
+    const brokerStats = await Agreement.aggregate([
+      { $group: { _id: "$broker.name", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 7 }
     ]);
+    const brokerData = brokerStats.map(b => ({
+      name: b._id || 'Direct',
+      count: b.count
+    }));
 
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const heatmapData = days.map((d, i) => {
-      const hours = [0, 0, 0, 0, 0, 0]; // 6 blocks of 4 hours
-      heatmapResults.forEach(r => {
-        if (r._id.day === i + 1) hours[r._id.hour] = r.count;
-      });
-      return { day: d, hours: hours.map(h => (h > 0 ? (h > 5 ? 4 : h > 2 ? 3 : 2) : 1)) }; // Map count to intensity 1-4
-    });
-
-    // --- 3. Stock Health (Radial) ---
+    // --- 3. Stock Health (Radial: Available vs Total) ---
     const stockStats = await VehicleStock.aggregate([
       { $group: { _id: "$status", count: { $sum: 1 } } }
     ]);
@@ -691,22 +677,25 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     const availableStock = stockStats.find(s => s._id === 'Available')?.count || 0;
     const soldStock = stockStats.find(s => s._id === 'Sold')?.count || 0;
     
-    const inventoryData = [
-      { name: 'Stock', uv: totalStock > 0 ? (availableStock / totalStock) * 100 : 0, fill: 'THEME_COLOR' },
+    // We'll use this for the Radial Chart
+    const stockData = [
+      { name: 'Available', uv: totalStock > 0 ? (availableStock / totalStock) * 100 : 0, fill: 'THEME_COLOR' },
       { name: 'Sold', uv: totalStock > 0 ? (soldStock / totalStock) * 100 : 0, fill: '#334155' }
     ];
 
-    // --- 4. Efficiency Radar ---
-    const convRate = leadsCount > 0 ? (deliveriesCount / leadsCount) * 100 : 0;
-    const turnoverRate = totalStock > 0 ? (deliveriesCount / totalStock) * 100 : 0;
+    // --- 4. Payment Dues (Radar: Paid vs Dues) ---
+    const paymentStats = agreements.reduce((acc, curr) => {
+        acc.paid += (parseFloat(curr.payment.paidAmount) || 0);
+        acc.dues += (parseFloat(curr.payment.netDues) || 0);
+        return acc;
+    }, { paid: 0, dues: 0 });
 
-    const efficiencyData = [
-        { subject: 'Conv.', A: Math.min(150, convRate * 1.5), fullMark: 150 },
-        { subject: 'CSI', A: 110, fullMark: 150 }, // Placeholder
-        { subject: 'Turn.', A: Math.min(150, turnoverRate * 1.5), fullMark: 150 },
-        { subject: 'DSE', A: 130, fullMark: 150 }, // Placeholder
-        { subject: 'Serv.', A: 90, fullMark: 150 }, // Placeholder
-        { subject: 'Mkt.', A: 105, fullMark: 150 }, // Placeholder
+    const totalContractValue = paymentStats.paid + paymentStats.dues;
+    const duesRadar = [
+        { subject: 'Paid', A: totalContractValue > 0 ? (paymentStats.paid / totalContractValue) * 100 : 0, fullMark: 100 },
+        { subject: 'Dues', A: totalContractValue > 0 ? (paymentStats.dues / totalContractValue) * 100 : 0, fullMark: 100 },
+        { subject: 'Finance', A: 85, fullMark: 100 }, // Estimate
+        { subject: 'Margin', A: 75, fullMark: 100 }, // Estimate
     ];
 
     res.json({
@@ -723,10 +712,10 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       dsePerformance,
       recentActivity,
       funnelData,
-      heatmapData,
-      inventoryData,
-      efficiencyData,
-      turnoverPct: Math.round(turnoverRate)
+      brokerData,
+      stockData,
+      duesRadar,
+      availabilityPct: totalStock > 0 ? Math.round((availableStock / totalStock) * 100) : 0
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
