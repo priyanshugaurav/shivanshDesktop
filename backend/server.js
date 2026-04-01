@@ -647,17 +647,17 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
 
     const activityFeed = [
       ...recentLeads.map(l => ({
-        text: `New Lead: ${l.personal.firstName} ${l.personal.lastName}`,
+        text: `Customer Created: ${l.personal.firstName} ${l.personal.lastName}`,
         time: l.createdAt,
         type: 'info'
       })),
       ...recentBookings.map(b => ({
-        text: `New Booking: ${b.customer?.personal.firstName || 'Customer'} (${b.details.model})`,
+        text: `Challan Updated: ${b.customer?.personal.firstName || 'Customer'} ${b.customer?.personal.lastName || ''}`,
         time: b.createdAt,
         type: 'warning'
       })),
       ...recentAgreements.map(a => ({
-        text: `New Sale: ${a.customerId?.personal.firstName || 'Customer'} (${a.model.name})`,
+        text: `Agreement Created: ${a.customerId?.personal.firstName || 'Customer'} ${a.customerId?.personal.lastName || ''}`,
         time: a.createdAt,
         type: 'success'
       }))
