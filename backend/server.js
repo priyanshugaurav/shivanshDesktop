@@ -342,6 +342,15 @@ app.put('/api/challan/:id', verifyToken, async (req, res) => {
 
 // --- Agreement Routes ---
 
+app.get('/api/agreements', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find().populate('customerId').sort({ createdAt: -1 });
+    res.json(agreements);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/agreement', verifyToken, async (req, res) => {
   try {
     // Auto-generate Agreement ID (starts from 1001)
