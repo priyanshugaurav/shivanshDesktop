@@ -1059,7 +1059,7 @@ app.post('/api/employees', verifyToken, async (req, res) => {
     const year = new Date().getFullYear();
     const employeeId = `EMP-${year}-${(count + 1).toString().padStart(3, '0')}`;
 
-    const newEmployee = new Employee({
+    const newEmployee = await Employee.create({
       personal,
       professional: { ...professional, employeeId },
       financial
