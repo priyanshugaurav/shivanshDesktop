@@ -37,8 +37,9 @@ const TechnicalStockDashboard = ({ theme: t }) => {
         chassisNo: '',
         motorNo: '',
         batteryNo: '',
-        color: 'Red',
-        batteryNo: '',
+        batteryCompany: '',
+        chargerNo: '',
+        chargerCompany: '',
         color: 'Red',
         purchaseRate: '',
         hsn: ''
@@ -416,16 +417,6 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Purchase Rate (₹)</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={stockForm.purchaseRate}
-                                                    onChange={(e) => setStockForm({...stockForm, purchaseRate: e.target.value})}
-                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
                                                 <span className="text-[10px] font-bold text-slate-500 uppercase">HSN Code</span>
                                                 <input 
                                                     type="text" 
@@ -467,6 +458,17 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                         </div>
 
                                         <div className="space-y-1">
+                                            <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Tag size={12}/> BATTERY COMPANY</span>
+                                            <input 
+                                                type="text" 
+                                                value={stockForm.batteryCompany}
+                                                onChange={(e) => setStockForm({...stockForm, batteryCompany: e.target.value})}
+                                                className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
+                                                placeholder="e.g. Eastman, Exide"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Zap size={12}/> MOTOR NO.</span>
                                             <input 
                                                 type="text" 
@@ -475,6 +477,29 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                 className="w-full h-10 px-3 rounded border border-slate-200 font-mono font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
                                                 placeholder="Enter Motor/Engine No"
                                             />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Hash size={12}/> CHARGER NO.</span>
+                                                <input 
+                                                    type="text" 
+                                                    value={stockForm.chargerNo}
+                                                    onChange={(e) => setStockForm({...stockForm, chargerNo: e.target.value})}
+                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
+                                                    placeholder="Charger Serial"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Settings size={12}/> CHARGER COMPANY</span>
+                                                <input 
+                                                    type="text" 
+                                                    value={stockForm.chargerCompany}
+                                                    onChange={(e) => setStockForm({...stockForm, chargerCompany: e.target.value})}
+                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
+                                                    placeholder="Manufacturer"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -590,6 +615,9 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                                     chassisNo: item.chassisNo,
                                                                     motorNo: item.motorNo,
                                                                     batteryNo: item.batteryNo,
+                                                                    batteryCompany: item.batteryCompany || '',
+                                                                    chargerNo: item.chargerNo || '',
+                                                                    chargerCompany: item.chargerCompany || '',
                                                                     color: item.color,
                                                                     purchaseRate: item.purchaseRate,
                                                                     hsn: item.hsn

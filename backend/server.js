@@ -261,6 +261,9 @@ const VehicleStockSchema = new mongoose.Schema({
   chassisNo: { type: String, required: true, unique: true, trim: true },
   motorNo: { type: String, trim: true },
   batteryNo: { type: String, trim: true },
+  batteryCompany: { type: String, trim: true, default: '' },
+  chargerNo: { type: String, trim: true, default: '' },
+  chargerCompany: { type: String, trim: true, default: '' },
 
   // Financials
   purchaseRate: { type: Number, default: 0 },
