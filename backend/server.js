@@ -494,13 +494,16 @@ app.post('/api/challan', verifyToken, async (req, res) => {
       checklist
     });
     
-    // Deduct stock
+    // Deduct stock - aggressively clean chassis number
     if (engine && engine.frameNo) {
-        const normalizedFrameNo = engine.frameNo.trim().toUpperCase();
-        await VehicleStock.findOneAndUpdate(
+        const normalizedFrameNo = engine.frameNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        console.log(`[CHALLAN CREATE] Looking for chassis: "${normalizedFrameNo}"`);
+        const stockResult = await VehicleStock.findOneAndUpdate(
             { chassisNo: normalizedFrameNo }, 
-            { status: 'Sold' }
+            { status: 'Sold' },
+            { new: true }
         );
+        console.log(`[CHALLAN CREATE] Stock update result:`, stockResult ? `Found & marked Sold (${stockResult._id})` : 'NOT FOUND in stock');
     }
 
     await Customer.findByIdAndUpdate(customerId, { $set: { 'pipeline.challan': true } });
@@ -529,26 +532,58 @@ app.put('/api/challan/:id', verifyToken, async (req, res) => {
       { new: true }
     );
 
-    // Stock Rollback/Sync Logic
-    if (oldChallan && req.body.engine && req.body.engine.frameNo) {
-        const oldFrame = (oldChallan.engine?.frameNo || '').trim().toUpperCase();
-        const newFrame = req.body.engine.frameNo.trim().toUpperCase();
+    // Stock Sync Logic - ALWAYS run to ensure chassis is marked Sold
+    if (req.body.engine && req.body.engine.frameNo) {
+        const newFrame = req.body.engine.frameNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        const oldFrame = (oldChallan?.engine?.frameNo || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 
-        if (oldFrame !== newFrame) {
-            // 1. Release old chassis back to Available
-            if (oldFrame) {
-                await VehicleStock.findOneAndUpdate({ chassisNo: oldFrame }, { status: 'Available' });
-            }
-            // 2. Mark new chassis as Sold
-            if (newFrame) {
-                await VehicleStock.findOneAndUpdate({ chassisNo: newFrame }, { status: 'Sold' });
-            }
+        console.log(`[CHALLAN UPDATE] Old frame: "${oldFrame}", New frame: "${newFrame}"`);
+
+        // If chassis changed, release old one
+        if (oldFrame && oldFrame !== newFrame) {
+            await VehicleStock.findOneAndUpdate({ chassisNo: oldFrame }, { status: 'Available' });
+            console.log(`[CHALLAN UPDATE] Released old chassis: ${oldFrame}`);
+        }
+
+        // ALWAYS mark current chassis as Sold
+        if (newFrame) {
+            const stockResult = await VehicleStock.findOneAndUpdate(
+                { chassisNo: newFrame }, 
+                { status: 'Sold' },
+                { new: true }
+            );
+            console.log(`[CHALLAN UPDATE] Mark Sold result:`, stockResult ? `Done (${stockResult._id})` : 'NOT FOUND in stock');
         }
     }
 
     res.json(updatedChallan);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// --- Bulk Stock Sync (Fix existing challans) ---
+app.post('/api/challan/sync-stock', verifyToken, async (req, res) => {
+  try {
+    const allChallans = await Challan.find({ 'engine.frameNo': { $exists: true, $ne: '' } });
+    let matched = 0, notFound = 0;
+
+    for (const challan of allChallans) {
+      const frame = (challan.engine?.frameNo || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (!frame) continue;
+
+      const result = await VehicleStock.findOneAndUpdate(
+        { chassisNo: frame },
+        { status: 'Sold' },
+        { new: true }
+      );
+      if (result) { matched++; } else { notFound++; }
+    }
+    
+    console.log(`[SYNC] Processed ${allChallans.length} challans. Matched: ${matched}, Not in stock: ${notFound}`);
+    res.json({ message: `Sync complete. ${matched} units marked Sold. ${notFound} chassis not found in stock.`, matched, notFound });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
