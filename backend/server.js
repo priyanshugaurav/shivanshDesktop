@@ -496,8 +496,9 @@ app.post('/api/challan', verifyToken, async (req, res) => {
     
     // Deduct stock
     if (engine && engine.frameNo) {
+        const normalizedFrameNo = engine.frameNo.trim().toUpperCase();
         await VehicleStock.findOneAndUpdate(
-            { chassisNo: engine.frameNo }, 
+            { chassisNo: normalizedFrameNo }, 
             { status: 'Sold' }
         );
     }
@@ -521,11 +522,30 @@ app.get('/api/challan/:customerId', verifyToken, async (req, res) => {
 
 app.put('/api/challan/:id', verifyToken, async (req, res) => {
   try {
+    const oldChallan = await Challan.findById(req.params.id);
     const updatedChallan = await Challan.findByIdAndUpdate(
       req.params.id, 
       { $set: req.body }, 
       { new: true }
     );
+
+    // Stock Rollback/Sync Logic
+    if (oldChallan && req.body.engine && req.body.engine.frameNo) {
+        const oldFrame = (oldChallan.engine?.frameNo || '').trim().toUpperCase();
+        const newFrame = req.body.engine.frameNo.trim().toUpperCase();
+
+        if (oldFrame !== newFrame) {
+            // 1. Release old chassis back to Available
+            if (oldFrame) {
+                await VehicleStock.findOneAndUpdate({ chassisNo: oldFrame }, { status: 'Available' });
+            }
+            // 2. Mark new chassis as Sold
+            if (newFrame) {
+                await VehicleStock.findOneAndUpdate({ chassisNo: newFrame }, { status: 'Sold' });
+            }
+        }
+    }
+
     res.json(updatedChallan);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -554,6 +574,17 @@ app.post('/api/agreement', verifyToken, async (req, res) => {
 
     const newAgreement = await Agreement.create(payload);
     await Customer.findByIdAndUpdate(payload.customerId, { $set: { 'pipeline.agreement': true } });
+
+    // Sync Stock status from Agreement chassis just in case Challan was skipped
+    // We already enriched registration-queue with challan frameNo, 
+    // but some users might manually enter chassis in Agreement if no Challan exists.
+    // Assuming model or broker selection doesn't carry chassis, but some UI might.
+    // If 'engine' data is present in Agreement payload as well:
+    if (payload.engine && payload.engine.frameNo) {
+        const frame = payload.engine.frameNo.trim().toUpperCase();
+        await VehicleStock.findOneAndUpdate({ chassisNo: frame }, { status: 'Sold' });
+    }
+
     res.status(201).json(newAgreement);
   } catch (error) {
     res.status(500).json({ message: error.message });

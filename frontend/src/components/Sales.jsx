@@ -592,13 +592,19 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     const handleDeepChange = (section, field, value) => {
       setFormData(prev => ({
         ...prev,
-        [section]: { ...prev[section], [field]: value }
+        [section]: { 
+            ...prev[section], 
+            [field]: typeof value === 'string' ? value.toUpperCase() : value 
+        }
       }));
     };
     
     // Simple state change for root level
     const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+      setFormData(prev => ({ 
+          ...prev, 
+          [field]: typeof value === 'string' ? value.toUpperCase() : value 
+      }));
     };
 
     // MASTER CALCULATION HOOK (8 CALCS)
