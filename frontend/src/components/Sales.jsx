@@ -10,7 +10,7 @@ import {
   X, Trash2, Eye, Clock, MapPin, AlertCircle, Lock, ArrowDown, ShieldCheck, Mail, Edit2, Zap, Tag, Layers, ClipboardCheck, Fingerprint,
   
   // New Icons
-  Printer, Car, ScrollText, Landmark, UserCheck, Calculator, Share2
+  Printer, Car, ScrollText, Landmark, UserCheck, Calculator, Share2, Package
 } from 'lucide-react';
 
 // --- CONFIGURATION —— uses env var in production, relative /api in dev (Vite proxy) ---
@@ -239,12 +239,18 @@ const ViewChallan = ({ theme, customer, onBack, onEdit }) => {
                 <div className="grid grid-cols-2 md:grid-cols-4 border-b border-slate-200 divide-y md:divide-y-0 md:divide-x divide-slate-100">
                     <GridItem label="Engine No" value={data.engine.engineNo} />
                     <GridItem label="Frame / Chassis" value={data.engine.frameNo} />
-                    <GridItem label="Cylinder No" value={data.engine.cylinderNo} />
-                    <GridItem label="Motor No" value={data.engine.motorNo} />
+                    <GridItem label="Variant" value={data.details.variant} />
+                    <GridItem label="Voltage" value={data.details.voltage} />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 border-b border-slate-200 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-slate-50/30">
-                    <GridItem label="Key No" value={data.registration.keyNo} />
                     <GridItem label="Battery No" value={data.registration.batteryNo} />
+                    <GridItem label="Battery Company" value={data.registration.batteryCompany} />
+                    <GridItem label="Charger No" value={data.registration.chargerNo} />
+                    <GridItem label="Charger Company" value={data.registration.chargerCompany} />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 border-b border-slate-200 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                    <GridItem label="Key No" value={data.registration.keyNo} />
+                    <GridItem label="Motor No" value={data.engine.motorNo} />
                     <GridItem label="Product No" value={data.registration.productNo} />
                     <GridItem label="Book No" value={data.registration.bookNo} />
                 </div>
@@ -999,13 +1005,16 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         model: '', 
         dto: '', 
         make: 'RAJHANS', 
-        color: '' 
+        color: '',
+        variant: '',
+        voltage: ''
     },
-    registration: { productNo: '', bookNo: '', keyNo: '', batteryNo: '' },
+    registration: { productNo: '', bookNo: '', keyNo: '', batteryNo: '', batteryCompany: '', chargerNo: '', chargerCompany: '' },
     engine: { frameNo: '', engineNo: '', cylinderNo: '', motorNo: '' },
     ids: { aadhar: '', pan: '' },
     checklist: []
   });
+  const [availableStocks, setAvailableStocks] = useState([]);
 
   // Full Checklist
   const checklistItems = [
@@ -1033,6 +1042,13 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                         setAvailableColors(selectedStock.colors);
                     }
                 }
+            }
+
+            // Fetch available specific stocks for linking
+            const availRes = await fetch(`${API_URL}/available-stocks`, { headers: { 'Authorization': token } });
+            if (availRes.ok) {
+                const availData = await availRes.json();
+                setAvailableStocks(availData);
             }
         } catch (e) { console.error("Failed to fetch stocks", e); }
     };
@@ -1063,7 +1079,40 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
               color: colors.length > 0 ? colors[0] : '' 
           }
       }));
-  }
+  };
+
+  const handleSelectStock = (stockId) => {
+      const selected = availableStocks.find(s => s._id === stockId);
+      if (!selected) return;
+      
+      const modelName = selected.modelId?.name || '';
+      const colors = stocks.find(s => s.modelName === modelName)?.colors || [];
+      setAvailableColors(colors);
+
+      // Auto-fill fields
+      setFormData(prev => ({
+          ...prev,
+          details: {
+              ...prev.details,
+              model: modelName,
+              color: selected.color || '',
+              variant: selected.variant || 'Lead Acid',
+              voltage: selected.voltage || '48V',
+          },
+          registration: {
+              ...prev.registration,
+              batteryNo: selected.batteryNo || '',
+              batteryCompany: selected.batteryCompany || '',
+              chargerNo: selected.chargerNo || '',
+              chargerCompany: selected.chargerCompany || '',
+          },
+          engine: {
+              ...prev.engine,
+              frameNo: selected.chassisNo || '',
+              motorNo: selected.motorNo || '',
+          }
+      }));
+  };
 
   const handleChecklist = (item) => {
     setFormData(prev => {
@@ -1157,6 +1206,28 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
          <div className="flex-1 bg-slate-50/50 overflow-y-auto">
             <form className="p-6 md:p-8 space-y-6" onSubmit={e => e.preventDefault()}>
                 
+                {/* 0. SMART STOCK SELECTOR */}
+                <div className="bg-indigo-50 p-5 rounded-xl border border-indigo-100 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-4">
+                    <div className="flex items-center gap-3 text-indigo-500 min-w-max">
+                        <Package className="h-6 w-6" />
+                        <div>
+                            <span className="block text-xs font-black uppercase tracking-wider text-indigo-700">Auto-fill from Stock</span>
+                            <span className="block text-[10px] font-bold text-indigo-500/70">Select an available unit instantly</span>
+                        </div>
+                    </div>
+                    <select 
+                        onChange={(e) => handleSelectStock(e.target.value)}
+                        className={`flex-1 w-full px-3 py-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 uppercase shadow-sm cursor-pointer`}
+                    >
+                        <option value="">-- SEARCH BY CHASSIS, MOTOR, OR BATTERY --</option>
+                        {availableStocks.map(stock => (
+                            <option key={stock._id} value={stock._id}>
+                                {stock.chassisNo} | MDL: {stock.modelId?.name || 'N/A'} | BATT: {stock.batteryNo || 'N/A'}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
                 {/* 1. Basic Details */}
                 <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText className={`h-3 w-3 ${theme.text}`} /> Basic Details</h3>
@@ -1231,6 +1302,34 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                               />
                           )}
                       </div>
+
+                      {/* Variant and Voltage */}
+                      <div className="col-span-6 md:col-span-4">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Variant(Battery Type)</label>
+                          <select 
+                              value={formData.details.variant || ''} 
+                              onChange={e => handleDeepChange('details', 'variant', e.target.value)} 
+                              className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring} uppercase`}
+                          >
+                              <option value="">Select</option>
+                              <option value="Lead Acid">Lead Acid</option>
+                              <option value="Lithium Ion">Lithium Ion</option>
+                          </select>
+                      </div>
+
+                      <div className="col-span-6 md:col-span-4">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Voltage</label>
+                          <select 
+                              value={formData.details.voltage || ''} 
+                              onChange={e => handleDeepChange('details', 'voltage', e.target.value)} 
+                              className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring} uppercase`}
+                          >
+                              <option value="">Select</option>
+                              <option value="48V">48V</option>
+                              <option value="60V">60V</option>
+                          </select>
+                      </div>
+
                    </div>
                 </div>
 
@@ -1242,6 +1341,9 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                       <div className="col-span-6 md:col-span-3"><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Book No</label><input type="text" value={formData.registration.bookNo} onChange={e => handleDeepChange('registration', 'bookNo', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} /></div>
                       <div className="col-span-6 md:col-span-3"><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Key No</label><input type="text" value={formData.registration.keyNo} onChange={e => handleDeepChange('registration', 'keyNo', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} /></div>
                       <div className="col-span-6 md:col-span-3"><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Battery No</label><input type="text" value={formData.registration.batteryNo} onChange={e => handleDeepChange('registration', 'batteryNo', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} /></div>
+                      <div className="col-span-6 md:col-span-3"><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Battery Company</label><input type="text" value={formData.registration.batteryCompany || ''} onChange={e => handleDeepChange('registration', 'batteryCompany', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} /></div>
+                      <div className="col-span-6 md:col-span-3"><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Charger No</label><input type="text" value={formData.registration.chargerNo || ''} onChange={e => handleDeepChange('registration', 'chargerNo', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} /></div>
+                      <div className="col-span-6 md:col-span-3"><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Charger Company</label><input type="text" value={formData.registration.chargerCompany || ''} onChange={e => handleDeepChange('registration', 'chargerCompany', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} /></div>
                    </div>
                 </div>
 

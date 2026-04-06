@@ -29,6 +29,7 @@ const TechnicalStockDashboard = ({ theme: t }) => {
     // Filter State
     const [filterVariant, setFilterVariant] = useState('All'); 
     const [filterVoltage, setFilterVoltage] = useState('All'); 
+    const [filterStatus, setFilterStatus] = useState('Available');
 
     // Add Stock Form State
     const initialStockForm = {
@@ -188,7 +189,8 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                               (stock.batteryNo && stock.batteryNo.toLowerCase().includes(searchTerm.toLowerCase()));
         const matchesVariant = filterVariant === 'All' || stock.variant === filterVariant;
         const matchesVoltage = filterVoltage === 'All' || stock.voltage === filterVoltage;
-        return matchesSearch && matchesVariant && matchesVoltage;
+        const matchesStatus = filterStatus === 'All' || stock.status === filterStatus;
+        return matchesSearch && matchesVariant && matchesVoltage && matchesStatus;
     });
 
     const totalStockValue = filteredStocks.reduce((sum, item) => sum + (item.purchaseRate || 0), 0);
@@ -523,7 +525,21 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                     <div className="flex-1 flex flex-col overflow-hidden">
                         
                         {/* Filters Bar */}
-                        <div className="px-6 py-3 border-b border-slate-100 flex gap-4 bg-slate-50/50">
+                        <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap gap-4 bg-slate-50/50">
+                            <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-lg">
+                                {['All', 'Available', 'Sold', 'Booked'].map(filter => (
+                                    <button
+                                        key={filter}
+                                        onClick={() => setFilterStatus(filter)}
+                                        className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${
+                                            filterStatus === filter ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        {filter}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="w-px border-l border-slate-200 my-1"></div>
                             <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-lg">
                                 {['All', 'Lead Acid', 'Lithium Ion'].map(filter => (
                                     <button
@@ -579,9 +595,9 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                     </thead>
                                     <tbody>
                                         {filteredStocks.map((item) => (
-                                            <tr key={item._id} className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors group">
+                                            <tr key={item._id} className={`border-b border-slate-50 transition-colors group ${item.status === 'Sold' ? 'bg-green-50/80 hover:bg-green-100/80' : 'hover:bg-slate-50/80'}`}>
                                                 <td className="py-3 px-4">
-                                                    <span className={`inline-block w-2 h-2 rounded-full ${item.status === 'Available' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                                                    <span className={`inline-block w-2 h-2 rounded-full ${item.status === 'Available' ? 'bg-emerald-500' : item.status === 'Sold' ? 'bg-slate-800' : 'bg-red-500'}`}></span>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <span className="font-mono text-xs font-bold text-slate-700">{item.chassisNo}</span>

@@ -87,12 +87,17 @@ const ChallanSchema = new mongoose.Schema({
     dto: String,
     make: String,
     color: String,
+    variant: String,
+    voltage: String,
   },
   registration: {
     productNo: String,
     bookNo: String,
     keyNo: String,
     batteryNo: String,
+    batteryCompany: String,
+    chargerNo: String,
+    chargerCompany: String,
   },
   engine: {
     frameNo: String,
@@ -480,6 +485,14 @@ app.post('/api/challan', verifyToken, async (req, res) => {
       checklist
     });
     
+    // Deduct stock
+    if (engine && engine.frameNo) {
+        await VehicleStock.findOneAndUpdate(
+            { chassisNo: engine.frameNo }, 
+            { status: 'Sold' }
+        );
+    }
+
     await Customer.findByIdAndUpdate(customerId, { $set: { 'pipeline.challan': true } });
     res.status(201).json(newChallan);
   } catch (error) {
@@ -678,10 +691,18 @@ app.get('/api/stocks/:modelId', verifyToken, async (req, res) => {
 app.get('/api/stocks/chassis/:chassisNo', verifyToken, async (req, res) => {
     try {
         const stock = await VehicleStock.findOne({ chassisNo: req.params.chassisNo }).populate('modelId');
-        if (!stock) {
-            return res.status(404).json({ message: 'Stock not found with this Chassis Number' });
-        }
+        if (!stock) return res.status(404).json({ message: 'Stock not found' });
         res.json(stock);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3.2 Get ALL available stocks (For Challan Auto-fill)
+app.get('/api/available-stocks', verifyToken, async (req, res) => {
+    try {
+        const stocks = await VehicleStock.find({ status: 'Available' }).populate('modelId');
+        res.json(stocks);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
