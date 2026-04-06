@@ -22,7 +22,8 @@ import Home from './Home'; // Imported Home Component
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
-    const [activeTab, setActiveTab] = useState('home');
+    const [activeTab, setActiveTab] = useState(() => localStorage.getItem('nexus_activeTab') || 'home');
+    const [visitedTabs, setVisitedTabs] = useState([localStorage.getItem('nexus_activeTab') || 'home']);
     const [sidebarSearch, setSidebarSearch] = useState('');
     const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
@@ -32,6 +33,11 @@ const Dashboard = () => {
     useEffect(() => {
         localStorage.setItem('nexus_theme', currentTheme);
     }, [currentTheme]);
+
+    useEffect(() => {
+        localStorage.setItem('nexus_activeTab', activeTab);
+        setVisitedTabs(prev => prev.includes(activeTab) ? prev : [...prev, activeTab]);
+    }, [activeTab]);
 
     const themes = {
         emerald: { label: 'Growth', primary: 'bg-emerald-600', light: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', ring: 'focus:ring-emerald-500/20' },
@@ -88,42 +94,37 @@ const Dashboard = () => {
 
     // --- CONTENT RENDERING HELPER ---
     const renderContent = () => {
-        switch (activeTab) {
-            case 'home':
-                return <Home theme={t} setActiveTab={setActiveTab} />;
-            case 'sales':
-                return <Sales theme={t} />;
-            case 'enquiry':
-                return <Enquiry theme={t} />;
-            case 'closed_enquiry':
-                return <ClosedEnquiry theme={t} />;
-            case 'enquiry_stats':
-                return <EnquiryStats theme={t} />;
-            case 'stock':
-                return <Stock theme={t} />;
-            case 'analytics':
-                return <SalesAnalytics theme={t} />;
-            case 'employees':
-                return <Employee theme={t} />;
-            case 'dues': 
-                return <Dues theme={t} />;
-            case 'add_vehicle': 
-                return <AddVehicle theme={t} />;
-            case 'expenses': 
-                return <Expense theme={t} />;
-            default:
-                return (
-                    <div className="w-full h-96 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-center p-8 opacity-60">
-                        <div className={`h-12 w-12 rounded-xl ${t.light} flex items-center justify-center mb-3`}>
-                            <Command className={`h-6 w-6 ${t.text}`} />
-                        </div>
-                        <h3 className="text-sm font-bold text-slate-900">No {activeTab.replace('_', ' ')} Found</h3>
-                        <p className="text-xs text-gray-500 max-w-xs mt-1">
-                            This section is currently under development or empty.
-                        </p>
-                    </div>
-                );
+        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses'];
+        
+        if (!validTabs.includes(activeTab)) {
+             return (
+                 <div className="w-full h-96 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center text-center p-8 opacity-60">
+                     <div className={`h-12 w-12 rounded-xl ${t.light} flex items-center justify-center mb-3`}>
+                         <Command className={`h-6 w-6 ${t.text}`} />
+                     </div>
+                     <h3 className="text-sm font-bold text-slate-900">No {activeTab.replace('_', ' ')} Found</h3>
+                     <p className="text-xs text-gray-500 max-w-xs mt-1">
+                         This section is currently under development or empty.
+                     </p>
+                 </div>
+             );
         }
+
+        return (
+            <>
+                {visitedTabs.includes('home') && <div className={activeTab === 'home' ? 'block' : 'hidden'}><Home theme={t} setActiveTab={setActiveTab} /></div>}
+                {visitedTabs.includes('sales') && <div className={activeTab === 'sales' ? 'block' : 'hidden'}><Sales theme={t} /></div>}
+                {visitedTabs.includes('enquiry') && <div className={activeTab === 'enquiry' ? 'block' : 'hidden'}><Enquiry theme={t} /></div>}
+                {visitedTabs.includes('closed_enquiry') && <div className={activeTab === 'closed_enquiry' ? 'block' : 'hidden'}><ClosedEnquiry theme={t} /></div>}
+                {visitedTabs.includes('enquiry_stats') && <div className={activeTab === 'enquiry_stats' ? 'block' : 'hidden'}><EnquiryStats theme={t} /></div>}
+                {visitedTabs.includes('stock') && <div className={activeTab === 'stock' ? 'block' : 'hidden'}><Stock theme={t} /></div>}
+                {visitedTabs.includes('analytics') && <div className={activeTab === 'analytics' ? 'block' : 'hidden'}><SalesAnalytics theme={t} /></div>}
+                {visitedTabs.includes('employees') && <div className={activeTab === 'employees' ? 'block' : 'hidden'}><Employee theme={t} /></div>}
+                {visitedTabs.includes('dues') && <div className={activeTab === 'dues' ? 'block' : 'hidden'}><Dues theme={t} /></div>}
+                {visitedTabs.includes('add_vehicle') && <div className={activeTab === 'add_vehicle' ? 'block' : 'hidden'}><AddVehicle theme={t} /></div>}
+                {visitedTabs.includes('expenses') && <div className={activeTab === 'expenses' ? 'block' : 'hidden'}><Expense theme={t} /></div>}
+            </>
+        );
     };
 
     return (
