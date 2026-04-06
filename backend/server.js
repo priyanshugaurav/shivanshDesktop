@@ -610,16 +610,6 @@ app.post('/api/agreement', verifyToken, async (req, res) => {
     const newAgreement = await Agreement.create(payload);
     await Customer.findByIdAndUpdate(payload.customerId, { $set: { 'pipeline.agreement': true } });
 
-    // Sync Stock status from Agreement chassis just in case Challan was skipped
-    // We already enriched registration-queue with challan frameNo, 
-    // but some users might manually enter chassis in Agreement if no Challan exists.
-    // Assuming model or broker selection doesn't carry chassis, but some UI might.
-    // If 'engine' data is present in Agreement payload as well:
-    if (payload.engine && payload.engine.frameNo) {
-        const frame = payload.engine.frameNo.trim().toUpperCase();
-        await VehicleStock.findOneAndUpdate({ chassisNo: frame }, { status: 'Sold' });
-    }
-
     res.status(201).json(newAgreement);
   } catch (error) {
     res.status(500).json({ message: error.message });
