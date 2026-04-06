@@ -351,24 +351,30 @@ app.get('/api/dashboard/stats', verifyToken, async (req, res) => {
     const lastMonth = lastMonthDate.toLocaleString('default', { month: 'long' });
     const lastMonthYear = lastMonthDate.getFullYear();
 
-    // 1. Profit (From Agreements - dse.finalNetProfit)
-    const agreements = await Agreement.find({
-      createdAt: { $gte: new Date(now.getFullYear(), now.getMonth(), 1) }
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // 1. Profit (Calculate using Agreements but filtered by the Challan Date)
+    const currentMonthChallans = await Challan.find({
+      'details.challanDate': { $gte: startOfMonth, $lte: endOfMonth }
     });
+    const currentMonthCustomerIds = currentMonthChallans.map(c => c.customer);
+    const agreements = await Agreement.find({ customerId: { $in: currentMonthCustomerIds } });
+    
     const currentMonthProfit = agreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
     const currentMonthRevenue = agreements.reduce((acc, curr) => acc + (Number(curr.payment?.paidAmount) || 0), 0);
 
-    const lastMonthAgreements = await Agreement.find({
-      createdAt: { 
-        $gte: new Date(lastMonthYear, lastMonthDate.getMonth(), 1),
-        $lt: new Date(now.getFullYear(), now.getMonth(), 1)
-      }
+    const startOfLastMonth = new Date(lastMonthYear, lastMonthDate.getMonth(), 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const lastMonthChallans = await Challan.find({
+      'details.challanDate': { $gte: startOfLastMonth, $lte: endOfLastMonth }
     });
+    const lastMonthCustomerIds = lastMonthChallans.map(c => c.customer);
+    const lastMonthAgreements = await Agreement.find({ customerId: { $in: lastMonthCustomerIds } });
+
     const lastMonthProfit = lastMonthAgreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
     const profitGrowth = lastMonthProfit === 0 ? 100 : ((currentMonthProfit - lastMonthProfit) / lastMonthProfit) * 100;
-
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
     // 2. Enquiries (Filtered by this month)
     const totalEnquiries = await Enquiry.countDocuments({ status: { $ne: 'Closed' }, createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
@@ -804,34 +810,49 @@ app.get('/api/inventory', verifyToken, async (req, res) => {
 app.get('/api/analytics/sales', verifyToken, async (req, res) => {
   try {
     const { range, month, year } = req.query;
-    let query = {};
+    let challanQuery = {};
     const now = new Date();
     
     if (range) {
         if (range === 'This Month') {
             const start = new Date(now.getFullYear(), now.getMonth(), 1);
             const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-            query.createdAt = { $gte: start, $lte: end };
+            challanQuery['details.challanDate'] = { $gte: start, $lte: end };
         } else if (range === 'Last Month') {
             const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-            query.createdAt = { $gte: start, $lte: end };
+            challanQuery['details.challanDate'] = { $gte: start, $lte: end };
         } else if (range === 'Custom Month' && month && year) {
             const monthIdx = new Date(`${month} 1, 2000`).getMonth();
             const start = new Date(year, monthIdx, 1);
             const end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
-            query.createdAt = { $gte: start, $lte: end };
+            challanQuery['details.challanDate'] = { $gte: start, $lte: end };
         } else if (range === 'All Time') {
-            query = {}; // No date filter
+            challanQuery = {}; 
         }
     } else {
-        // Default to This Month if not specified
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        query.createdAt = { $gte: start, $lte: end };
+        challanQuery['details.challanDate'] = { $gte: start, $lte: end };
     }
 
-    const agreements = await Agreement.find(query).sort({ createdAt: 1 });
+    const challans = await Challan.find(challanQuery);
+    const customerIds = challans.map(c => c.customer);
+
+    // Map each customer to their challan date for accurate historical rendering
+    const challanDateMap = {};
+    challans.forEach(c => {
+       if (c.customer && c.details?.challanDate) {
+          challanDateMap[c.customer.toString()] = new Date(c.details.challanDate);
+       }
+    });
+
+    // If 'All Time', fetch all agreements. Otherwise filter strictly by Challans
+    const agreementQuery = (range === 'All Time' || (Object.keys(challanQuery).length === 0 && !challanQuery['details.challanDate'])) 
+        ? {} 
+        : { customerId: { $in: customerIds } };
+        
+    const agreements = await Agreement.find(agreementQuery).sort({ createdAt: 1 });
     
     // KPI Aggregation
     const stats = agreements.reduce((acc, curr) => {
@@ -851,7 +872,7 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     });
 
     agreements.forEach(agg => {
-      const date = new Date(agg.createdAt);
+      const date = challanDateMap[agg.customerId?.toString()] || new Date(agg.createdAt);
       const monthLabel = months[date.getMonth()];
       if (!monthlyMap[monthLabel]) {
         monthlyMap[monthLabel] = { name: monthLabel, revenue: 0, expenses: 0, profit: 0 };
@@ -879,7 +900,7 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
         id: agg.agreementId || agg._id.toString().slice(-6),
         customer: 'Customer',
         model: agg.model.name,
-        date: new Date(agg.createdAt).toLocaleDateString(),
+        date: (challanDateMap[agg.customerId?.toString()] || new Date(agg.createdAt)).toLocaleDateString(),
         amount: `₹ ${formatter.format(parseFloat(agg.model.onRoadPrice) || 0)}`,
         status: parseFloat(agg.payment.netDues) <= 0 ? 'Paid' : 'Pending'
     }));
