@@ -15,7 +15,9 @@ import {
 
 const SalesAnalytics = ({ theme: t }) => {
     // --- STATE MANAGEMENT ---
-    const [timeRange, setTimeRange] = useState('Monthly');
+    const [timeRange, setTimeRange] = useState('This Month');
+    const [customMonth, setCustomMonth] = useState(new Date().toLocaleString('default', { month: 'short' }));
+    const [customYear, setCustomYear] = useState(new Date().getFullYear().toString());
     const [selectedBranch, setSelectedBranch] = useState('All Branches');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -26,7 +28,12 @@ const SalesAnalytics = ({ theme: t }) => {
             setLoading(true);
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch('/api/analytics/sales', {
+                const queryParams = new URLSearchParams({
+                    range: timeRange,
+                    ...(timeRange === 'Custom Month' && { month: customMonth, year: customYear })
+                }).toString();
+                
+                const response = await fetch(`/api/analytics/sales?${queryParams}`, {
                     headers: { 'Authorization': token }
                 });
                 if (!response.ok) throw new Error('Failed to fetch analytics');
@@ -40,7 +47,7 @@ const SalesAnalytics = ({ theme: t }) => {
             }
         };
         fetchAnalytics();
-    }, []);
+    }, [timeRange, customMonth, customYear]);
 
     // --- THEME UTILS ---
     const getThemeHex = () => {
@@ -159,20 +166,40 @@ const SalesAnalytics = ({ theme: t }) => {
                 {/* Floating Control Dock */}
                 <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100">
                     {/* Time Range */}
-                    <div className="bg-slate-50 p-1 rounded-xl flex items-center">
-                        {['Weekly', 'Monthly', 'Yearly'].map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setTimeRange(range)}
-                                className={`px-4 py-2 rounded-lg text-[10px] font-black transition-all ${
-                                    timeRange === range 
-                                    ? `bg-white text-slate-900 shadow-sm` 
-                                    : 'text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                {range}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                        <select 
+                            value={timeRange}
+                            onChange={(e) => setTimeRange(e.target.value)}
+                            className="bg-white px-3 py-1.5 border border-slate-200 shadow-sm rounded-lg text-[10px] uppercase font-black text-slate-700 outline-none cursor-pointer"
+                        >
+                            <option value="This Month">This Month</option>
+                            <option value="Last Month">Last Month</option>
+                            <option value="Custom Month">Custom Month</option>
+                            <option value="All Time">All Time</option>
+                        </select>
+                        
+                        {timeRange === 'Custom Month' && (
+                            <div className="flex items-center gap-1 animate-in fade-in zoom-in slide-in-from-left-2 duration-300">
+                                <select 
+                                    value={customMonth}
+                                    onChange={(e) => setCustomMonth(e.target.value)}
+                                    className="bg-white px-2 py-1.5 border border-slate-200 shadow-sm rounded-lg text-[10px] font-bold text-slate-700 outline-none cursor-pointer"
+                                >
+                                    {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                                <select 
+                                    value={customYear}
+                                    onChange={(e) => setCustomYear(e.target.value)}
+                                    className="bg-white px-2 py-1.5 border border-slate-200 shadow-sm rounded-lg text-[10px] font-bold text-slate-700 outline-none cursor-pointer"
+                                >
+                                    {[2024, 2025, 2026, 2027].map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                     </div>
 
                     <div className="w-px h-8 bg-slate-100 mx-1"></div>

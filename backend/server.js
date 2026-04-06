@@ -367,10 +367,13 @@ app.get('/api/dashboard/stats', verifyToken, async (req, res) => {
     const lastMonthProfit = lastMonthAgreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
     const profitGrowth = lastMonthProfit === 0 ? 100 : ((currentMonthProfit - lastMonthProfit) / lastMonthProfit) * 100;
 
-    // 2. Enquiries
-    const totalEnquiries = await Enquiry.countDocuments({ status: { $ne: 'Closed' } });
-    const hotEnquiries = await Enquiry.countDocuments({ status: 'Hot' });
-    const newEnquiries = await Enquiry.countDocuments({ status: 'New' });
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // 2. Enquiries (Filtered by this month)
+    const totalEnquiries = await Enquiry.countDocuments({ status: { $ne: 'Closed' }, createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
+    const hotEnquiries = await Enquiry.countDocuments({ status: 'Hot', createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
+    const newEnquiries = await Enquiry.countDocuments({ status: 'New', createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
 
     // 3. Inventory
     const totalInventory = await VehicleStock.countDocuments({ status: 'Available' });
@@ -800,7 +803,35 @@ app.get('/api/inventory', verifyToken, async (req, res) => {
 // 8. Sales Analytics Aggregator
 app.get('/api/analytics/sales', verifyToken, async (req, res) => {
   try {
-    const agreements = await Agreement.find().sort({ createdAt: 1 });
+    const { range, month, year } = req.query;
+    let query = {};
+    const now = new Date();
+    
+    if (range) {
+        if (range === 'This Month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            query.createdAt = { $gte: start, $lte: end };
+        } else if (range === 'Last Month') {
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+            query.createdAt = { $gte: start, $lte: end };
+        } else if (range === 'Custom Month' && month && year) {
+            const monthIdx = new Date(`${month} 1, 2000`).getMonth();
+            const start = new Date(year, monthIdx, 1);
+            const end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+            query.createdAt = { $gte: start, $lte: end };
+        } else if (range === 'All Time') {
+            query = {}; // No date filter
+        }
+    } else {
+        // Default to This Month if not specified
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        query.createdAt = { $gte: start, $lte: end };
+    }
+
+    const agreements = await Agreement.find(query).sort({ createdAt: 1 });
     
     // KPI Aggregation
     const stats = agreements.reduce((acc, curr) => {
