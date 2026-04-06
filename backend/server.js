@@ -263,10 +263,6 @@ const VehicleStockSchema = new mongoose.Schema({
   batteryNo: { type: String, trim: true },
 
   // Financials
-  exShowroom: { type: Number, default: 0 },
-  insurance: { type: Number, default: 0 },
-  rto: { type: Number, default: 0 },
-  permit: { type: Number, default: 0 },
   purchaseRate: { type: Number, default: 0 },
   hsn: { type: String, default: '' },
   

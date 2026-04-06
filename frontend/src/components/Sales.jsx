@@ -559,10 +559,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                                     model: {
                                         ...prev.model,
                                         name: unitData.modelId?.name || challanData.details?.model || '',
-                                        exShowroom: (unitData.exShowroom || 0).toString(),
-                                        insurance: (unitData.insurance || 0).toString(),
-                                        rto: (unitData.rto || 0).toString(),
-                                        permit: (unitData.permit || 0).toString(),
                                         landingPrice: (unitData.purchaseRate || 0).toString()
                                     }
                                 }));
@@ -687,10 +683,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                 model: {
                     ...prev.model,
                     name: modelName,
-                    exShowroom: (selectedModel.pricing.exShowroom || 0).toString(),
-                    insurance: (selectedModel.pricing.insurance || 0).toString(),
-                    rto: (selectedModel.pricing.rto || 0).toString(),
-                    permit: (selectedModel.pricing.permit || 0).toString(),
                     landingPrice: (selectedModel.purchaseRate || 0).toString()
                 }
             }));

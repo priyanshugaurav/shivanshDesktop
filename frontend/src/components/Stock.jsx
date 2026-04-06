@@ -38,12 +38,10 @@ const TechnicalStockDashboard = ({ theme: t }) => {
         motorNo: '',
         batteryNo: '',
         color: 'Red',
+        batteryNo: '',
+        color: 'Red',
         purchaseRate: '',
-        hsn: '',
-        exShowroom: '',
-        insurance: '',
-        rto: '',
-        permit: ''
+        hsn: ''
     };
     const [stockForm, setStockForm] = useState(initialStockForm);
     const [submitting, setSubmitting] = useState(false);
@@ -418,41 +416,11 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Ex-Showroom (₹)</span>
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Purchase Rate (₹)</span>
                                                 <input 
                                                     type="number" 
-                                                    value={stockForm.exShowroom}
-                                                    onChange={(e) => setStockForm({...stockForm, exShowroom: e.target.value})}
-                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Insurance (₹)</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={stockForm.insurance}
-                                                    onChange={(e) => setStockForm({...stockForm, insurance: e.target.value})}
-                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">RTO (₹)</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={stockForm.rto}
-                                                    onChange={(e) => setStockForm({...stockForm, rto: e.target.value})}
-                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Permit (₹)</span>
-                                                <input 
-                                                    type="number" 
-                                                    value={stockForm.permit}
-                                                    onChange={(e) => setStockForm({...stockForm, permit: e.target.value})}
+                                                    value={stockForm.purchaseRate}
+                                                    onChange={(e) => setStockForm({...stockForm, purchaseRate: e.target.value})}
                                                     className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
                                                     placeholder="0.00"
                                                 />
@@ -624,11 +592,7 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                                     batteryNo: item.batteryNo,
                                                                     color: item.color,
                                                                     purchaseRate: item.purchaseRate,
-                                                                    hsn: item.hsn,
-                                                                    exShowroom: item.exShowroom || '',
-                                                                    insurance: item.insurance || '',
-                                                                    rto: item.rto || '',
-                                                                    permit: item.permit || ''
+                                                                    hsn: item.hsn
                                                                 });
                                                                 setViewMode('add_stock');
                                                             }}
