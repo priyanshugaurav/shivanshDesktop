@@ -198,16 +198,19 @@ const Expense = ({ theme: t }) => {
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                     </div>
 
-                    {/* Add Button (Conditional) */}
+                    {/* Add Button (Now always enabled) */}
                     <button 
-                        disabled={!isCurrentPeriod}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold text-white shadow-lg transition-all ${
-                            isCurrentPeriod 
-                            ? `${t.primary} hover:shadow-xl hover:-translate-y-0.5` 
-                            : 'bg-slate-300 cursor-not-allowed opacity-70'
-                        }`}
+                        onClick={() => {
+                            const formElement = document.getElementById('expense-form');
+                            if (formElement) {
+                                formElement.scrollIntoView({ behavior: 'smooth' });
+                                // Optional: focus first input
+                                formElement.querySelector('input')?.focus();
+                            }
+                        }}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-bold text-white shadow-lg transition-all ${t.primary} hover:shadow-xl hover:-translate-y-0.5`}
                     >
-                        {isCurrentPeriod ? <Plus size={14} /> : <Lock size={12} />} 
+                        <Plus size={14} />
                         <span>Add Expense</span>
                     </button>
                 </div>
@@ -388,7 +391,7 @@ const Expense = ({ theme: t }) => {
                 <div className="space-y-6">
                     
                     {/* Quick Add Form */}
-                    <div className={`bg-white p-6 rounded-[2rem] border border-slate-200/60 shadow-sm transition-opacity ${!isCurrentPeriod ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div id="expense-form" className={`bg-white p-6 rounded-[2rem] border border-slate-200/60 shadow-sm transition-opacity`}>
                         <div className="flex items-center gap-2 mb-6 border-b border-slate-50 pb-4">
                             <div className={`p-2 rounded-xl ${t.light} ${t.text}`}>
                                 <Receipt size={18} />
@@ -418,13 +421,33 @@ const Expense = ({ theme: t }) => {
                                     onChange={e => setNewExpense({...newExpense, category: e.target.value})}
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-100 transition-all cursor-pointer"
                                 >
-                                    <option>Rent & Lease</option>
-                                    <option>Utilities (Electricity/Water)</option>
-                                    <option>Marketing & Ads</option>
-                                    <option>Maintenance</option>
+                                    <option>Salary</option>
+                                    <option>Rent</option>
+                                    <option>Electricity</option>
+                                    <option>Water Bill</option>
+                                    <option>Internet / Wi-Fi</option>
+                                    <option>Fuel</option>
+                                    <option>Vehicle Maintenance</option>
+                                    <option>Insurance (Vehicle/Health)</option>
+                                    <option>Spare Parts Purchase</option>
+                                    <option>Workshop Tools & Equipment</option>
+                                    <option>Employee Training</option>
+                                    <option>Towing Charges</option>
+                                    <option>Logistics / Transport</option>
                                     <option>Office Supplies</option>
-                                    <option>Travel & Fuel</option>
-                                    <option>Other</option>
+                                    <option>Software Subscriptions (CRM, ERP)</option>
+                                    <option>Marketing / Advertising</option>
+                                    <option>Loan EMI</option>
+                                    <option>Legal / Consultant Fees</option>
+                                    <option>Government Fees / RTO Charges</option>
+                                    <option>Courier / Delivery Charges</option>
+                                    <option>Cleaning & Sanitation</option>
+                                    <option>Event / Sponsorship</option>
+                                    <option>Security Services</option>
+                                    <option>Refreshments / Staff Welfare</option>
+                                    <option>Office Event</option>
+                                    <option>Miscellaneous</option>
+                                    <option>Others</option>
                                 </select>
                             </div>
 
