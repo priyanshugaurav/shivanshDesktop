@@ -23,6 +23,14 @@ const Expense = ({ theme: t }) => {
 
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'add'
     
+    // --- MANUAL DATE STATE ---
+    const [manualDateEnabled, setManualDateEnabled] = useState(false);
+    const [selectedDay, setSelectedDay] = useState(today.getDate());
+
+    // Dynamic days available for the current selection
+    const daysInMonth = new Date(selectedDate.year, selectedDate.month + 1, 0).getDate();
+    const dayOptions = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    
     // --- THEME UTILS ---
     const getThemeGradient = () => {
         if (t.primary.includes('emerald')) return 'from-emerald-500 to-emerald-700';
@@ -90,7 +98,8 @@ const Expense = ({ theme: t }) => {
                 body: JSON.stringify({
                     ...newExpense,
                     month: months[selectedDate.month],
-                    year: selectedDate.year
+                    year: selectedDate.year,
+                    date: manualDateEnabled ? selectedDay : today.getDate()
                 })
             });
             if (res.ok) {
@@ -123,7 +132,6 @@ const Expense = ({ theme: t }) => {
     const payrollTotal = Array.isArray(expenses) ? expenses.filter(e => e.type === 'Payroll').reduce((acc, curr) => acc + curr.amount, 0) : 0;
     
     // Daily average based on days passed or full month
-    const daysInMonth = new Date(selectedDate.year, selectedDate.month + 1, 0).getDate();
     const daysToCount = isCurrentPeriod ? today.getDate() : daysInMonth;
     const dailyAvg = totalSpend / (daysToCount || 1);
 
@@ -196,6 +204,32 @@ const Expense = ({ theme: t }) => {
                             {years.map((y) => <option key={y} value={y}>{y}</option>)}
                         </select>
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                    </div>
+
+                    {/* Manual Date Toggle & Day Selector */}
+                    <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={manualDateEnabled}
+                                onChange={(e) => setManualDateEnabled(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-slate-800 focus:ring-slate-400 cursor-pointer"
+                            />
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">Manual Date</span>
+                        </label>
+                        
+                        {manualDateEnabled && (
+                            <div className="relative border-l border-slate-100 pl-3 ml-1">
+                                <select 
+                                    value={selectedDay}
+                                    onChange={(e) => setSelectedDay(parseInt(e.target.value))}
+                                    className="appearance-none bg-transparent pr-6 py-1 text-xs font-black text-slate-800 focus:outline-none cursor-pointer"
+                                >
+                                    {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={10} />
+                            </div>
+                        )}
                     </div>
 
                     {/* Add Button (Now always enabled) */}
