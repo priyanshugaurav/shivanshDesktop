@@ -361,8 +361,8 @@ const Home = ({ theme: t, setActiveTab }) => {
                                                 </p>
                                             </div>
                                         </div>
-                                        <a href={`tel:${lead.phone}`} className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95">
-                                            <TrendingUp size={14} /> Call
+                                        <a href={`tel:${lead.phone}`} className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95 font-mono">
+                                            <Phone size={14} /> {lead.phone}
                                         </a>
                                     </div>
                                 ))

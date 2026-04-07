@@ -166,6 +166,7 @@ const Enquiry = ({ theme }) => {
                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
                             <tr>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Customer Profile</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Salesman</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Requirement</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Timeline</th>
                                 <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status</th>
@@ -200,6 +201,12 @@ const Enquiry = ({ theme }) => {
                                                         <Phone className="h-3 w-3" /> {row.Phone}
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </td>
+
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-700">{row['Salesman'] || 'Unassigned'}</span>
                                             </div>
                                         </td>
                                         
