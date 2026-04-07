@@ -209,6 +209,7 @@ const processData = (data, announcements, days) => {
     };
 
     let funnel = { recorded: 0, fu1: 0, fu2: 0, fu3: 0 };
+    let hotLeadsData = [];
 
     filtered.forEach(row => {
         const recDate = parseDate(row['Date Recorded']);
@@ -267,7 +268,14 @@ const processData = (data, announcements, days) => {
         funnel.recorded++;
         if (row['Follow Up-1']) funnel.fu1++;
         if (row['Follow Up-2']) funnel.fu2++;
-        if (row['Follow Up-3']) funnel.fu3++;
+        if (row['Follow Up-3']) {
+            funnel.fu3++;
+            hotLeadsData.push({
+                name: row['Name'] || 'Unknown',
+                phone: row['Phone'] || 'N/A',
+                date: row['Follow Up-3']
+            });
+        }
     });
 
     // --- ANNOUNCEMENT PROCESSING ---
@@ -325,7 +333,8 @@ const processData = (data, announcements, days) => {
         salesmanStack,
         trendValues,
         dailyMap: counts.daily,
-        hotLeads: counts.nature['Hot'] || 0,
+        hotLeads: funnel.fu3,
+        hotLeadsData: hotLeadsData,
         warmLeads: counts.nature['Warm'] || 0,
         topSalesman: salesmanStack[0] || { label: 'None', total: 0 },
         announceData,
@@ -489,14 +498,17 @@ const EnquiryStats = ({ theme }) => {
                 </div>
 
                 {/* 2. Hot Leads */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all group">
+                <button 
+                    onClick={() => handleOpenModal({ label: 'Hot Pipeline', leads: stats.hotLeadsData, isHot: true })}
+                    className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all group text-left w-full"
+                >
                     <div className="flex justify-between items-start mb-2">
                         <div><p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Hot Pipeline</p><h3 className="text-3xl font-extrabold text-slate-800 mt-1">{stats.hotLeads}</h3></div>
                         <div className="p-3 rounded-xl bg-rose-50 text-rose-600 group-hover:scale-110 transition-transform"><Flame className="w-5 h-5" /></div>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full mt-4 overflow-hidden"><div className="bg-rose-500 h-full rounded-full transition-all duration-1000" style={{ width: `${(stats.hotLeads / stats.total) * 100}%` }}></div></div>
-                    <p className="text-[10px] text-slate-400 mt-2 font-bold text-right">{Math.round((stats.hotLeads / stats.total) * 100)}% Conv. Rate</p>
-                </div>
+                    <p className="text-[10px] text-slate-400 mt-2 font-bold text-right">{Math.round((stats.hotLeads / stats.total) * 100)}% Lead Quality</p>
+                </button>
 
                 {/* 3. Top Performer */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-lg transition-all group">
@@ -656,8 +668,10 @@ const EnquiryStats = ({ theme }) => {
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg z-10 overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800">Pending Follow-ups</h3>
-                                <p className="text-xs text-slate-500">Salesman: <span className="font-bold text-slate-700">{modalData.label}</span> • {modalData.value} Pending</p>
+                                <h3 className="text-lg font-bold text-slate-800">{modalData.label === 'Hot Pipeline' ? 'Hot Customers' : 'Pending Follow-ups'}</h3>
+                                <p className="text-xs text-slate-500">
+                                    {modalData.isHot ? 'High Priority' : `Salesman: ${modalData.label}`} • {modalData.leads.length} Records
+                                </p>
                             </div>
                             <button onClick={() => setModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X className="h-5 w-5 text-slate-500" /></button>
                         </div>
@@ -667,8 +681,8 @@ const EnquiryStats = ({ theme }) => {
                                     {modalData.leads.map((lead, idx) => (
                                         <div key={idx} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:shadow-md transition-shadow group">
                                             <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                                    <Users className="h-5 w-5" />
+                                                <div className={`h-10 w-10 rounded-full ${modalData.isHot ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'} flex items-center justify-center`}>
+                                                    {modalData.isHot ? <Flame className="h-5 w-5" /> : <Users className="h-5 w-5" />}
                                                 </div>
                                                 <div>
                                                     <p className="text-sm font-bold text-slate-800">{lead.name}</p>

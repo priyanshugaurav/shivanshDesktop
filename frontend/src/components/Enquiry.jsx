@@ -36,7 +36,7 @@ const Enquiry = ({ theme }) => {
     const [selectedEnquiry, setSelectedEnquiry] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
     const [isClosing, setIsClosing] = useState(null);
-    const [filters, setFilters] = useState({ salesman: 'All', village: 'All', period: 'All', nature: 'All' });
+    const [filters, setFilters] = useState({ salesman: 'All', village: 'All', period: 'All', status: 'All' });
 
     // --- FILTER LOGIC ---
     const uniqueSalesmen = useMemo(() => ['All', ...new Set(data.map(d => d.Salesman).filter(Boolean))], [data]);
@@ -52,7 +52,14 @@ const Enquiry = ({ theme }) => {
             if (!searchMatch) return false;
             if (filters.salesman !== 'All' && row.Salesman !== filters.salesman) return false;
             if (filters.village !== 'All' && row.Village !== filters.village) return false;
-            if (filters.nature !== 'All' && row['Model Nature'] !== filters.nature) return false;
+            
+            // Filter by lead status (Hot/In Progress/New) based on Follow Up fields
+            if (filters.status !== 'All') {
+                const rowStatus = getStatus(row).label;
+                if (filters.status === 'Hot' && rowStatus !== 'Hot Lead') return false;
+                if (filters.status === 'Progress' && rowStatus !== 'In Progress') return false;
+                if (filters.status === 'New' && rowStatus !== 'New Lead') return false;
+            }
             
             if (filters.period !== 'All') {
                 const diffDays = Math.ceil(Math.abs(new Date() - new Date(row['Date Recorded'])) / (1000 * 60 * 60 * 24));
@@ -128,18 +135,18 @@ const Enquiry = ({ theme }) => {
                                 className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-slate-400 transition-all shadow-sm"
                             />
                         </div>
-                        {['salesman', 'village', 'period', 'nature'].map(key => (
+                        {['salesman', 'village', 'period', 'status'].map(key => (
                             <select 
                                 key={key}
                                 className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none focus:border-slate-400 cursor-pointer capitalize shadow-sm"
                                 value={filters[key]}
                                 onChange={e => setFilters({...filters, [key]: e.target.value})}
                             >
-                                <option value="All">All {key === 'nature' ? 'Natures' : key + 's'}</option>
+                                <option value="All">All {key === 'status' ? 'Statuses' : key + 's'}</option>
                                 {key === 'salesman' && uniqueSalesmen.filter(s => s!=='All').map(s => <option key={s} value={s}>{s}</option>)}
                                 {key === 'village' && uniqueVillages.filter(v => v!=='All').map(v => <option key={v} value={v}>{v}</option>)}
                                 {key === 'period' && <><option value="7days">Last 7 Days</option><option value="30days">Last 30 Days</option></>}
-                                {key === 'nature' && <><option value="Hot">Hot</option><option value="Warm">Warm</option><option value="Cold">Cold</option></>}
+                                {key === 'status' && <><option value="Hot">🔥 Hot Lead</option><option value="Progress">🔵 In Progress</option><option value="New">🟢 New Lead</option></>}
                             </select>
                         ))}
                     </div>
