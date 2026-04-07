@@ -221,18 +221,23 @@ const processData = (data, announcements, days) => {
     let funnel = { recorded: 0, fu1: 0, fu2: 0, fu3: 0 };
     let hotLeadsData = [];
     let warmLeadsCount = 0;
+    let coldLeadsCount = 0;
 
     // Calculate Pipeline Metrics from FULL data (ignores time filter)
     data.forEach(row => {
+        const detail = {
+            name: row['Name'] || 'Unknown',
+            phone: row['Phone'] || 'N/A',
+            date: row['Follow Up-3'] || row['Follow Up-2'] || row['Follow Up-1'] || row['Date Recorded']
+        };
+
         if (row['Follow Up-3']) {
-            hotLeadsData.push({
-                name: row['Name'] || 'Unknown',
-                phone: row['Phone'] || 'N/A',
-                date: row['Follow Up-3']
-            });
+            hotLeadsData.push(detail);
+        } else if (row['Follow Up-1'] || row['Follow Up-2']) {
+            warmLeadsCount++;
+        } else {
+            coldLeadsCount++;
         }
-        const nature = row['Model Nature'];
-        if (nature === 'Warm') warmLeadsCount++;
     });
     const hotLeadsCount = hotLeadsData.length;
 

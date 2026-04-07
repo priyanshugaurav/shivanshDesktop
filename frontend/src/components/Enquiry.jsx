@@ -12,9 +12,9 @@ import { useEnquiries } from '../hooks/useEnquiries';
 const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
 
 const getStatus = (row) => {
-    if (row['Follow Up-3']) return { label: 'Hot Lead', color: 'text-rose-700 bg-rose-50 border-rose-200 ring-rose-100' };
-    if (row['Follow Up-1']) return { label: 'In Progress', color: 'text-blue-700 bg-blue-50 border-blue-200 ring-blue-100' };
-    return { label: 'New Lead', color: 'text-emerald-700 bg-emerald-50 border-emerald-200 ring-emerald-100' };
+    if (row['Follow Up-3']) return { label: '🔥 Hot', color: 'text-rose-700 bg-rose-50 border-rose-200 ring-rose-100' };
+    if (row['Follow Up-1']) return { label: '🟠 Warm', color: 'text-amber-700 bg-amber-50 border-amber-200 ring-amber-100' };
+    return { label: '❄️ Cold', color: 'text-blue-700 bg-blue-50 border-blue-200 ring-blue-100' };
 };
 
 const DetailRow = ({ icon: Icon, label, value }) => (
@@ -53,12 +53,12 @@ const Enquiry = ({ theme }) => {
             if (filters.salesman !== 'All' && row.Salesman !== filters.salesman) return false;
             if (filters.village !== 'All' && row.Village !== filters.village) return false;
             
-            // Filter by lead status (Hot/In Progress/New) based on Follow Up fields
+            // Filter by lead status (Hot/Warm/Cold) based on Follow Up fields
             if (filters.status !== 'All') {
                 const rowStatus = getStatus(row).label;
-                if (filters.status === 'Hot' && rowStatus !== 'Hot Lead') return false;
-                if (filters.status === 'Progress' && rowStatus !== 'In Progress') return false;
-                if (filters.status === 'New' && rowStatus !== 'New Lead') return false;
+                if (filters.status === 'Hot' && rowStatus !== '🔥 Hot') return false;
+                if (filters.status === 'Warm' && rowStatus !== '🟠 Warm') return false;
+                if (filters.status === 'Cold' && rowStatus !== '❄️ Cold') return false;
             }
             
             if (filters.period !== 'All') {
@@ -146,7 +146,7 @@ const Enquiry = ({ theme }) => {
                                 {key === 'salesman' && uniqueSalesmen.filter(s => s!=='All').map(s => <option key={s} value={s}>{s}</option>)}
                                 {key === 'village' && uniqueVillages.filter(v => v!=='All').map(v => <option key={v} value={v}>{v}</option>)}
                                 {key === 'period' && <><option value="7days">Last 7 Days</option><option value="30days">Last 30 Days</option></>}
-                                {key === 'status' && <><option value="Hot">🔥 Hot Lead</option><option value="Progress">🔵 In Progress</option><option value="New">🟢 New Lead</option></>}
+                                {key === 'status' && <><option value="Hot">🔥 Hot</option><option value="Warm">🟠 Warm</option><option value="Cold">❄️ Cold</option></>}
                             </select>
                         ))}
                     </div>
