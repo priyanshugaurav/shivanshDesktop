@@ -210,6 +210,21 @@ const processData = (data, announcements, days) => {
 
     let funnel = { recorded: 0, fu1: 0, fu2: 0, fu3: 0 };
     let hotLeadsData = [];
+    let warmLeadsCount = 0;
+
+    // Calculate Pipeline Metrics from FULL data (ignores time filter)
+    data.forEach(row => {
+        if (row['Follow Up-3']) {
+            hotLeadsData.push({
+                name: row['Name'] || 'Unknown',
+                phone: row['Phone'] || 'N/A',
+                date: row['Follow Up-3']
+            });
+        }
+        const nature = row['Model Nature'];
+        if (nature === 'Warm') warmLeadsCount++;
+    });
+    const hotLeadsCount = hotLeadsData.length;
 
     filtered.forEach(row => {
         const recDate = parseDate(row['Date Recorded']);
@@ -268,14 +283,7 @@ const processData = (data, announcements, days) => {
         funnel.recorded++;
         if (row['Follow Up-1']) funnel.fu1++;
         if (row['Follow Up-2']) funnel.fu2++;
-        if (row['Follow Up-3']) {
-            funnel.fu3++;
-            hotLeadsData.push({
-                name: row['Name'] || 'Unknown',
-                phone: row['Phone'] || 'N/A',
-                date: row['Follow Up-3']
-            });
-        }
+        if (row['Follow Up-3']) funnel.fu3++;
     });
 
     // --- ANNOUNCEMENT PROCESSING ---
@@ -333,9 +341,9 @@ const processData = (data, announcements, days) => {
         salesmanStack,
         trendValues,
         dailyMap: counts.daily,
-        hotLeads: funnel.fu3,
+        hotLeads: hotLeadsCount,
         hotLeadsData: hotLeadsData,
-        warmLeads: counts.nature['Warm'] || 0,
+        warmLeads: warmLeadsCount,
         topSalesman: salesmanStack[0] || { label: 'None', total: 0 },
         announceData,
         totalAnnouncements
@@ -347,7 +355,7 @@ const processData = (data, announcements, days) => {
 // ==========================================
 
 const EnquiryStats = ({ theme }) => {
-    const [timeRange, setTimeRange] = useState(30);
+    const [timeRange, setTimeRange] = useState('All');
     const [refreshKey, setRefreshKey] = useState(0); 
     const [lastUpdated, setLastUpdated] = useState(new Date());
     const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
