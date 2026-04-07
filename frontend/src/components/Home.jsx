@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     TrendingUp, Package, Users, CreditCard, 
     ArrowUpRight, ChevronRight, AlertCircle, 
-    MessageSquare, DollarSign, Wallet, Activity, Loader2
+    MessageSquare, DollarSign, Wallet, Activity, Loader2, Phone
 } from 'lucide-react';
 import { 
     AreaChart, Area, ResponsiveContainer, BarChart, Bar, Cell 
