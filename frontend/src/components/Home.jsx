@@ -7,11 +7,27 @@ import {
 import { 
     AreaChart, Area, ResponsiveContainer, BarChart, Bar, Cell 
 } from 'recharts';
+import { useEnquiries } from '../hooks/useEnquiries';
+
+const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+};
 
 const Home = ({ theme: t, setActiveTab }) => {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const { data: leadsData } = useEnquiries('Enquiries');
     
+    // Modal State
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalConfig, setModalConfig] = useState({ label: '', leads: [], isHot: false });
+
     // --- DATA FETCHING ---
     useEffect(() => {
         const fetchStats = async () => {
@@ -31,6 +47,29 @@ const Home = ({ theme: t, setActiveTab }) => {
         };
         fetchStats();
     }, []);
+
+    // --- LEAD PROCESSING ---
+    const leadStats = React.useMemo(() => {
+        if (!leadsData) return { total: 0, hot: [], warm: [], cold: [] };
+        
+        const hot = [];
+        const warm = [];
+        const cold = [];
+
+        leadsData.forEach(row => {
+            const detail = {
+                name: row.Name || 'Unknown',
+                phone: row.Phone || 'No Phone',
+                date: row['Follow Up-3'] || row['Follow Up-2'] || row['Follow Up-1'] || row['Date Recorded']
+            };
+
+            if (row['Follow Up-3']) hot.push(detail);
+            else if (row['Follow Up-1'] || row['Follow Up-2']) warm.push(detail);
+            else cold.push(detail);
+        });
+
+        return { total: leadsData.length, hot, warm, cold };
+    }, [leadsData]);
 
     // --- THEME UTILS ---
     const getThemeGradient = () => {
@@ -134,27 +173,39 @@ const Home = ({ theme: t, setActiveTab }) => {
 
                 {/* 2. ENQUIRY SUMMARY */}
                 <div 
-                    onClick={() => setActiveTab('enquiry')}
-                    className="p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm flex flex-col justify-between cursor-pointer group hover:border-slate-300 hover:shadow-xl transition-all"
+                    className="p-6 rounded-[2.5rem] bg-white border border-slate-100 shadow-sm flex flex-col justify-between group hover:border-slate-300 hover:shadow-xl transition-all"
                 >
-                    <div className="flex justify-between items-start">
-                        <div>
+                    <div className="flex justify-between items-start" onClick={() => setActiveTab('enquiry')}>
+                        <div className="cursor-pointer">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Leads</p>
-                            <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{stats.enquiries.total}</p>
+                            <p className="text-4xl font-black text-slate-900 mt-2 tracking-tight">{leadStats.total}</p>
                         </div>
                         <div className={`p-3 rounded-2xl ${t.light} ${t.text} group-hover:scale-110 transition-transform shadow-sm`}>
                             <MessageSquare size={20} />
                         </div>
                     </div>
                     <div className="flex gap-2 mt-4">
-                        <div className="flex-1 bg-rose-50/50 rounded-2xl p-2 text-center border border-rose-100/50">
+                        <button 
+                            onClick={() => { setModalConfig({ label: 'Hot Leads', leads: leadStats.hot, isHot: true }); setModalOpen(true); }}
+                            className="flex-1 bg-rose-50/50 rounded-2xl p-2 text-center border border-rose-100/50 hover:bg-rose-100 transition-colors"
+                        >
                             <p className="text-[8px] font-black text-rose-400 uppercase tracking-tighter">Hot</p>
-                            <p className="text-sm font-black text-rose-600">{stats.enquiries.hot}</p>
-                        </div>
-                        <div className="flex-1 bg-emerald-50/50 rounded-2xl p-2 text-center border border-emerald-100/50">
-                            <p className="text-[8px] font-black text-emerald-400 uppercase tracking-tighter">New</p>
-                            <p className="text-sm font-black text-emerald-600">{stats.enquiries.new}</p>
-                        </div>
+                            <p className="text-sm font-black text-rose-600">{leadStats.hot.length}</p>
+                        </button>
+                        <button 
+                            onClick={() => { setModalConfig({ label: 'Warm Leads', leads: leadStats.warm, isHot: false }); setModalOpen(true); }}
+                            className="flex-1 bg-amber-50/50 rounded-2xl p-2 text-center border border-amber-100/50 hover:bg-amber-100 transition-colors"
+                        >
+                            <p className="text-[8px] font-black text-amber-500 uppercase tracking-tighter">Warm</p>
+                            <p className="text-sm font-black text-amber-600">{leadStats.warm.length}</p>
+                        </button>
+                        <button 
+                            onClick={() => { setModalConfig({ label: 'Cold Leads', leads: leadStats.cold, isHot: false }); setModalOpen(true); }}
+                            className="flex-1 bg-slate-50/50 rounded-2xl p-2 text-center border border-slate-100 opacity-60 hover:opacity-100 hover:bg-slate-100 transition-colors"
+                        >
+                            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Cold</p>
+                            <p className="text-sm font-black text-slate-500">{leadStats.cold.length}</p>
+                        </button>
                     </div>
                 </div>
 
@@ -280,6 +331,54 @@ const Home = ({ theme: t, setActiveTab }) => {
                 </div>
             </div>
 
+            {/* --- MODAL FOR LEAD DETAILS --- */}
+            {modalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md transition-opacity" onClick={() => setModalOpen(false)}></div>
+                    
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg z-10 overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+                        <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tight">{modalConfig.label}</h3>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">
+                                    {modalConfig.isHot ? 'High Priority Conversion' : 'Lead Tracking'} • {modalConfig.leads.length} Records
+                                </p>
+                            </div>
+                            <button onClick={() => setModalOpen(false)} className="p-3 hover:bg-slate-200 rounded-2xl transition-colors bg-white shadow-sm border border-slate-100"><Users className="h-5 w-5 text-slate-500" /></button>
+                        </div>
+                        <div className="max-h-[50vh] overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {modalConfig.leads.length > 0 ? (
+                                modalConfig.leads.map((lead, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-[1.8rem] hover:shadow-xl hover:scale-[1.01] transition-all group border-l-4" style={{ borderColor: modalConfig.isHot ? '#f43f5e' : (modalConfig.label.includes('Warm') ? '#f59e0b' : '#cbd5e1') }}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={`h-12 w-12 rounded-2xl ${modalConfig.isHot ? 'bg-rose-50 text-rose-600' : 'bg-slate-50 text-slate-400'} flex items-center justify-center shadow-inner`}>
+                                                {modalConfig.isHot ? <Activity size={20} /> : <MessageSquare size={20} />}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-slate-800">{lead.name}</p>
+                                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1 mt-1">
+                                                    <Loader2 size={12} className="animate-spin" /> {formatDate(lead.date)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <a href={`tel:${lead.phone}`} className="flex items-center gap-2 px-5 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg active:scale-95">
+                                            <TrendingUp size={14} /> Call
+                                        </a>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="p-20 text-center text-slate-300">
+                                    <Activity className="h-16 w-16 mx-auto mb-4 opacity-10" />
+                                    <p className="text-xs font-black uppercase tracking-[0.2em]">No leads available</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-6 bg-slate-50/50 text-center border-t border-slate-100">
+                            <button onClick={() => setModalOpen(false)} className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Dismiss Detail View</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

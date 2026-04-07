@@ -37,6 +37,16 @@ const formatTime = (date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 };
 
+const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}-${month}-${year}`;
+};
+
 // ==========================================
 // 2. VISUAL ENGINE: Custom Charts
 // ==========================================
@@ -695,7 +705,7 @@ const EnquiryStats = ({ theme }) => {
                                                 <div>
                                                     <p className="text-sm font-bold text-slate-800">{lead.name}</p>
                                                     <p className="text-xs text-slate-400 font-mono flex items-center gap-1">
-                                                        <Clock className="h-3 w-3" /> {lead.date || 'Today'}
+                                                        <Clock className="h-3 w-3" /> {formatDate(lead.date)}
                                                     </p>
                                                 </div>
                                             </div>
