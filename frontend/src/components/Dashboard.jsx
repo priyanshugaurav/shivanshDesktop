@@ -19,6 +19,7 @@ import Dues from './Dues';
 import AddVehicle from './AddVehicle';
 import Expense from './Expense';
 import Home from './Home'; // Imported Home Component
+import Invoice from './Invoice';
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
@@ -63,6 +64,7 @@ const Dashboard = () => {
                 { id: 'add_vehicle', label: 'Add Vehicle/Permit', icon: Truck },
                 { id: 'employees', label: 'Staff & Payroll', icon: Users },
                 { id: 'expenses', label: 'Expense Manager', icon: CreditCard },
+                { id: 'invoice', label: 'Invoice', icon: FileText },
             ]
         },
         {
@@ -94,7 +96,7 @@ const Dashboard = () => {
 
     // --- CONTENT RENDERING HELPER ---
     const renderContent = () => {
-        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses'];
+        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice'];
         
         if (!validTabs.includes(activeTab)) {
              return (
@@ -123,6 +125,7 @@ const Dashboard = () => {
                 {visitedTabs.includes('dues') && <div className={activeTab === 'dues' ? 'block' : 'hidden'}><Dues theme={t} /></div>}
                 {visitedTabs.includes('add_vehicle') && <div className={activeTab === 'add_vehicle' ? 'block' : 'hidden'}><AddVehicle theme={t} /></div>}
                 {visitedTabs.includes('expenses') && <div className={activeTab === 'expenses' ? 'block' : 'hidden'}><Expense theme={t} /></div>}
+                {visitedTabs.includes('invoice') && <div className={activeTab === 'invoice' ? 'block' : 'hidden'}><Invoice theme={t} /></div>}
             </>
         );
     };
