@@ -122,8 +122,11 @@ const AgreementSchema = new mongoose.Schema({
     name: String,
     exShowroom: String,
     insurance: String,
+    actualInsurance: String,
     rto: String,
+    actualRto: String,
     permit: String,
+    discount: String,
     onRoadPrice: String,
     landingPrice: String
   },

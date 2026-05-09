@@ -400,9 +400,12 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <Field label="Model" value={data.model?.name} />
                           <Field label="Ex-Showroom" value={data.model?.exShowroom} />
-                          <Field label="Insurance" value={data.model?.insurance} />
-                          <Field label="RTO" value={data.model?.rto} />
+                          <Field label="Normal Insurance" value={data.model?.insurance} />
+                          <Field label="Actual Insurance" value={data.model?.actualInsurance} />
+                          <Field label="Normal RTO" value={data.model?.rto} />
+                          <Field label="Actual RTO" value={data.model?.actualRto} />
                           <Field label="Permit" value={data.model?.permit} />
+                          <Field label="Discount" value={data.model?.discount} />
                           <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
                               <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">On Road Price</span>
                               <span className="block text-sm font-bold text-indigo-700 font-mono">{data.model?.onRoadPrice}</span>
@@ -512,7 +515,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     
     const [formData, setFormData] = useState(initialData || {
       agreementId: '',
-      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', onRoadPrice: '0.00', landingPrice: '0.00' },
+      model: { name: '', exShowroom: '0', insurance: '0', actualInsurance: '0', rto: '0', actualRto: '0', permit: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
       dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
@@ -616,7 +619,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const insurance = safe(formData.model.insurance);
         const rto = safe(formData.model.rto);
         const permit = safe(formData.model.permit);
-        const onRoadPrice = (exShowroom + insurance + rto + permit).toFixed(2);
+        const discount = safe(formData.model.discount);
+        const onRoadPrice = (exShowroom + insurance + rto + permit - discount).toFixed(2);
         
         // 2. DTO Total (New: DTO Total = RTO)
         const dtoReg = safe(formData.dto.registration);
@@ -675,7 +679,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             }));
         }
     }, [
-        formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit,
+        formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit, formData.model.discount,
         formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit,
         formData.loan.processingFee, formData.loan.amount,
         formData.payment.paidAmount,
@@ -705,7 +709,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                 model: {
                     ...prev.model,
                     name: modelName,
-                    exShowroom: '0', insurance: '0', rto: '0', permit: '0'
+                    exShowroom: '0', insurance: '0', actualInsurance: '0', rto: '0', actualRto: '0', permit: '0', discount: '0'
                 }
             }));
         }
@@ -781,9 +785,12 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                           <div className="md:col-span-3 h-px bg-slate-100 my-1"></div>
                           <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label><select value={formData.model.name} onChange={e => onModelSelect(e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">Select Model</option>{stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}</select></div>
                           <Input label="Ex-Showroom" value={formData.model.exShowroom} onChange={v => handleDeepChange('model', 'exShowroom', v)} theme={theme} />
-                          <Input label="Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} theme={theme} />
-                          <Input label="RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} theme={theme} />
+                          <Input label="Normal Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} theme={theme} />
+                          <Input label="Actual Insurance" value={formData.model.actualInsurance} onChange={v => handleDeepChange('model', 'actualInsurance', v)} theme={theme} />
+                          <Input label="Normal RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} theme={theme} />
+                          <Input label="Actual RTO" value={formData.model.actualRto} onChange={v => handleDeepChange('model', 'actualRto', v)} theme={theme} />
                           <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} theme={theme} />
+                          <Input label="Discount" value={formData.model.discount} onChange={v => handleDeepChange('model', 'discount', v)} theme={theme} />
                           <div className="md:col-span-1">
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">On Road Price (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{formData.model.onRoadPrice}</div>
