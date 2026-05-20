@@ -118,17 +118,17 @@ const Challan = mongoose.models.Challan || mongoose.model('Challan', ChallanSche
 const AgreementSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   agreementId: String,
+  agreementType: { type: String, default: 'NORMAL' },
   model: {
     name: String,
     exShowroom: String,
     insurance: String,
-    actualInsurance: String,
     rto: String,
-    actualRto: String,
     permit: String,
     discount: String,
     onRoadPrice: String,
-    landingPrice: String
+    landingPrice: String,
+    sellingPrice: String
   },
   loan: {
     bankName: String,
@@ -761,6 +761,16 @@ app.get('/api/stocks/chassis/:chassisNo', verifyToken, async (req, res) => {
         const stock = await VehicleStock.findOne({ chassisNo: req.params.chassisNo }).populate('modelId');
         if (!stock) return res.status(404).json({ message: 'Stock not found' });
         res.json(stock);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3.1.5 Get ALL stocks (Used for Invoice where stock might be 'Sold')
+app.get('/api/all-stocks', verifyToken, async (req, res) => {
+    try {
+        const stocks = await VehicleStock.find().populate('modelId').sort({ createdAt: -1 });
+        res.json(stocks);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

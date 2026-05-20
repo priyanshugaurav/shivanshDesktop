@@ -400,16 +400,30 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <Field label="Model" value={data.model?.name} />
                           <Field label="Ex-Showroom" value={data.model?.exShowroom} />
-                          <Field label="Normal Insurance" value={data.model?.insurance} />
-                          <Field label="Actual Insurance" value={data.model?.actualInsurance} />
-                          <Field label="Normal RTO" value={data.model?.rto} />
-                          <Field label="Actual RTO" value={data.model?.actualRto} />
-                          <Field label="Permit" value={data.model?.permit} />
-                          <Field label="Discount" value={data.model?.discount} />
-                          <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
-                              <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">On Road Price</span>
-                              <span className="block text-sm font-bold text-indigo-700 font-mono">{data.model?.onRoadPrice}</span>
-                          </div>
+                          <Field label="Insurance" value={data.model?.insurance} />
+                          {data.agreementType === 'TYPE2' ? (
+                              <>
+                                  <Field label="Permit" value={data.model?.permit} />
+                                  <div className="bg-slate-100 rounded-lg p-3 border border-slate-200">
+                                      <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cost Price</span>
+                                      <span className="block text-sm font-bold text-slate-700 font-mono">{(parseFloat(data.model?.insurance||0) + parseFloat(data.model?.permit||0) + parseFloat(data.model?.exShowroom||0)).toFixed(2)}</span>
+                                  </div>
+                                  <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+                                      <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Selling Price</span>
+                                      <span className="block text-sm font-bold text-indigo-700 font-mono">{data.model?.sellingPrice || data.model?.onRoadPrice}</span>
+                                  </div>
+                              </>
+                          ) : (
+                              <>
+                                  <Field label="RTO" value={data.model?.rto} />
+                                  <Field label="Permit" value={data.model?.permit} />
+                                  <Field label="Discount" value={data.model?.discount} />
+                                  <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
+                                      <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">On Road Price</span>
+                                      <span className="block text-sm font-bold text-indigo-700 font-mono">{data.model?.onRoadPrice}</span>
+                                  </div>
+                              </>
+                          )}
                       </div>
                   </Section>
 
@@ -514,8 +528,9 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     const [loading, setLoading] = useState(false);
     
     const [formData, setFormData] = useState(initialData || {
+      agreementType: 'NORMAL',
       agreementId: '',
-      model: { name: '', exShowroom: '0', insurance: '0', actualInsurance: '0', rto: '0', actualRto: '0', permit: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00' },
+      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00', sellingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
       dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
@@ -614,23 +629,31 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     useEffect(() => {
         const safe = (val) => parseFloat(val) || 0;
         
-        // 1. On Road Price
         const exShowroom = safe(formData.model.exShowroom);
         const insurance = safe(formData.model.insurance);
         const rto = safe(formData.model.rto);
         const permit = safe(formData.model.permit);
         const discount = safe(formData.model.discount);
-        const onRoadPrice = (exShowroom + insurance + rto + permit - discount).toFixed(2);
-        
-        // 2. DTO Total (New: DTO Total = RTO)
-        const dtoReg = safe(formData.dto.registration);
-        const dtoOnline = safe(formData.dto.onlinePayment);
-        const dtoPermit = safe(formData.dto.permit);
-        const dtoTotal = rto.toFixed(2); 
-        
-        // 3. Magadh Margin (REMOVED)
         const bankFee = safe(formData.loan.processingFee);
         const loanAmt = safe(formData.loan.amount);
+        const brokerAmt = safe(formData.broker.amount);
+        const otherAmt = safe(formData.other.amount);
+        const landingPrice = safe(formData.model.landingPrice);
+
+        let onRoadPrice, netProfit;
+
+        if (formData.agreementType === 'TYPE2') {
+            const costPrice = insurance + permit + exShowroom;
+            const sellingPrice = safe(formData.model.sellingPrice);
+            onRoadPrice = sellingPrice.toFixed(2);
+            netProfit = (sellingPrice - costPrice - brokerAmt - otherAmt - bankFee).toFixed(2);
+        } else {
+            onRoadPrice = (exShowroom + insurance + rto + permit - discount).toFixed(2);
+            netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
+        }
+        
+        // 2. DTO Total (New: DTO Total = RTO)
+        const dtoTotal = formData.agreementType === 'TYPE2' ? '0.00' : rto.toFixed(2); 
         
         // 4. Down Payment (Manual logic from user: On Road - Loan)
         const downPayment = (safe(onRoadPrice) - loanAmt).toFixed(2);
@@ -638,14 +661,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         // 5. Dues (Down payment - Paid amount)
         const paidAmt = safe(formData.payment.paidAmount);
         const dues = (safe(downPayment) - paidAmt).toFixed(2);
-        
-        const brokerAmt = safe(formData.broker.amount);
-        const otherAmt = safe(formData.other.amount);
-        const baseProfit = (safe(downPayment) - (safe(dtoTotal) + brokerAmt + otherAmt)).toFixed(2);
-        
-        // 7. Net Profit (NEW: On Road - (RTO + Permit + Insurance + Loan Fee + Broker + Other) - Landing Cost)
-        const landingPrice = safe(formData.model.landingPrice);
-        const netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
         
         // 8. TDS and Final Net Profit (Dependent on Deal Commission)
         const dealCommission = safe(formData.dse.commission);
@@ -685,7 +700,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         formData.payment.paidAmount,
         formData.broker.amount, formData.other.amount,
         formData.dse.commission, formData.dse.dseCommission,
-        formData.model.landingPrice // Added landingPrice to dependencies
+        formData.model.landingPrice, formData.agreementType, formData.model.sellingPrice
     ]);
 
     // Handle Model Selection Sync
@@ -709,7 +724,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                 model: {
                     ...prev.model,
                     name: modelName,
-                    exShowroom: '0', insurance: '0', actualInsurance: '0', rto: '0', actualRto: '0', permit: '0', discount: '0'
+                    exShowroom: '0', insurance: '0', rto: '0', permit: '0', discount: '0', sellingPrice: '0.00'
                 }
             }));
         }
@@ -776,6 +791,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
            <div className="flex-1 bg-slate-50/50 overflow-y-auto">
               <form className="p-6 md:p-8 space-y-8" onSubmit={e => e.preventDefault()}>
                   <div>
+                      <div className="flex items-center gap-4 mb-6">
+                           <button type="button" onClick={() => handleChange('agreementType', 'NORMAL')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'NORMAL' || !formData.agreementType ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Normal Calc</button>
+                           <button type="button" onClick={() => handleChange('agreementType', 'TYPE2')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'TYPE2' ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Cost vs Selling Price</button>
+                      </div>
+
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Car className="h-4 w-4 text-slate-400" /> Agreement & Model Details</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="md:col-span-3">
@@ -785,17 +805,29 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                           <div className="md:col-span-3 h-px bg-slate-100 my-1"></div>
                           <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label><select value={formData.model.name} onChange={e => onModelSelect(e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option value="">Select Model</option>{stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}</select></div>
                           <Input label="Ex-Showroom" value={formData.model.exShowroom} onChange={v => handleDeepChange('model', 'exShowroom', v)} theme={theme} />
-                          <Input label="Normal Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} theme={theme} />
-                          <Input label="Actual Insurance" value={formData.model.actualInsurance} onChange={v => handleDeepChange('model', 'actualInsurance', v)} theme={theme} />
-                          <Input label="Normal RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} theme={theme} />
-                          <Input label="Actual RTO" value={formData.model.actualRto} onChange={v => handleDeepChange('model', 'actualRto', v)} theme={theme} />
-                          <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} theme={theme} />
-                          <Input label="Discount" value={formData.model.discount} onChange={v => handleDeepChange('model', 'discount', v)} theme={theme} />
-                          <div className="md:col-span-1">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">On Road Price (Auto)</label>
-                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{formData.model.onRoadPrice}</div>
-                          </div>
-                          <Input label="Landing Cost (Ex-Showroom + Taxes)" value={formData.model.landingPrice} onChange={v => handleDeepChange('model', 'landingPrice', v)} theme={theme} />
+                          <Input label="Insurance" value={formData.model.insurance} onChange={v => handleDeepChange('model', 'insurance', v)} theme={theme} />
+                          
+                          {formData.agreementType === 'TYPE2' ? (
+                               <>
+                                   <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} theme={theme} />
+                                   <div className="md:col-span-1">
+                                       <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Cost Price (Auto)</label>
+                                       <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{(parseFloat(formData.model.insurance||0) + parseFloat(formData.model.permit||0) + parseFloat(formData.model.exShowroom||0)).toFixed(2)}</div>
+                                   </div>
+                                   <Input label="Selling Price" value={formData.model.sellingPrice} onChange={v => handleDeepChange('model', 'sellingPrice', v)} theme={theme} />
+                               </>
+                          ) : (
+                               <>
+                                  <Input label="RTO" value={formData.model.rto} onChange={v => handleDeepChange('model', 'rto', v)} theme={theme} />
+                                  <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} theme={theme} />
+                                  <Input label="Discount" value={formData.model.discount} onChange={v => handleDeepChange('model', 'discount', v)} theme={theme} />
+                                  <div className="md:col-span-1">
+                                      <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">On Road Price (Auto)</label>
+                                      <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{formData.model.onRoadPrice}</div>
+                                  </div>
+                                  <Input label="Landing Cost (Ex-Showroom + Taxes)" value={formData.model.landingPrice} onChange={v => handleDeepChange('model', 'landingPrice', v)} theme={theme} />
+                               </>
+                          )}
                       </div>
                   </div>
 

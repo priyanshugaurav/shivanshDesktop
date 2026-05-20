@@ -94,6 +94,65 @@ const Invoice = ({ theme }) => {
         }
     }, [metaMode]);
 
+    // --- Autocomplete State & Fetch ---
+    const [customersList, setCustomersList] = useState([]);
+    const [stocksList, setStocksList] = useState([]);
+
+    useEffect(() => {
+        const fetchOptions = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                const headers = { 'Authorization': token };
+                const [custRes, stockRes] = await Promise.all([
+                    fetch(`${API_URL}/customers`, { headers }),
+                    fetch(`${API_URL}/all-stocks`, { headers })
+                ]);
+                if (custRes.ok) setCustomersList(await custRes.json());
+                if (stockRes.ok) setStocksList(await stockRes.json());
+            } catch (err) {
+                console.error("Failed to fetch autocomplete options", err);
+            }
+        };
+        fetchOptions();
+    }, []);
+
+    const handleCustomerChange = (e) => {
+        const value = e.target.value;
+        const matched = customersList.find(c => `${c.personal?.firstName || ''} ${c.personal?.lastName || ''} (${c.generatedId || 'Unknown'})`.trim() === value);
+        if (matched) {
+            setFormData(prev => ({
+                ...prev,
+                customerName: `${matched.personal?.firstName || ''} ${matched.personal?.lastName || ''}`.trim(),
+                addressLine1: matched.address?.village || '',
+                addressLine2: `${matched.address?.district || ''}, ${matched.address?.pincode || ''}`.replace(/^,\s*|,\s*$/g, ''),
+                state: 'BIHAR', // default state
+                aadharNo: '', // Not in customer schema directly
+                panNo: ''
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, customerName: value }));
+        }
+    };
+
+    const handleModelChange = (e) => {
+        const value = e.target.value;
+        const matched = stocksList.find(s => `${s.modelId?.name || 'Unknown'} (Chassis: ${s.chassisNo})` === value);
+        if (matched) {
+            setFormData(prev => ({
+                ...prev,
+                modelName: matched.modelId?.name || '',
+                batteryNo: matched.batteryNo || '',
+                chargerNo: matched.chargerNo || '', // Usually mapped from challan, but we'll try to map if it exists
+                chassisNo: matched.chassisNo || '',
+                motorNo: matched.motorNo || '',
+                color: matched.color || 'BLUE'
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, modelName: value }));
+        }
+    };
+
     // --- Helpers ---
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-IN', {
@@ -189,11 +248,17 @@ const Invoice = ({ theme }) => {
     };
 
     // --- Calculations ---
-    const rateValue = parseFloat(formData.rate) || 0;
-    const cgstValue = rateValue * (parseFloat(formData.cgstPercent) / 100) || 0;
-    const sgstValue = rateValue * (parseFloat(formData.sgstPercent) / 100) || 0;
+    const enteredTotal = parseFloat(formData.rate) || 0;
+    const cgstPercent = parseFloat(formData.cgstPercent) || 0;
+    const sgstPercent = parseFloat(formData.sgstPercent) || 0;
+    const totalTaxPercent = cgstPercent + sgstPercent;
+    
+    // Backward calculation for Inclusive GST
+    const rateValue = enteredTotal / (1 + (totalTaxPercent / 100));
+    const cgstValue = rateValue * (cgstPercent / 100);
+    const sgstValue = rateValue * (sgstPercent / 100);
     const totalTaxValue = cgstValue + sgstValue;
-    const totalInvoiceValue = rateValue + totalTaxValue;
+    const totalInvoiceValue = enteredTotal;
 
     // Format Date for preview
     const previewDate = formData.date ? new Date(formData.date).toLocaleDateString('en-GB') : '';
@@ -210,6 +275,17 @@ const Invoice = ({ theme }) => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+                    {/* Datalists for Autocomplete */}
+                    <datalist id="customersDatalist">
+                        {customersList.map(c => (
+                            <option key={c._id} value={`${c.personal?.firstName || ''} ${c.personal?.lastName || ''} (${c.generatedId || 'Unknown'})`.trim()} />
+                        ))}
+                    </datalist>
+                    <datalist id="stocksDatalist">
+                        {stocksList.map(s => (
+                            <option key={s._id} value={`${s.modelId?.name || 'Unknown'} (Chassis: ${s.chassisNo})`} />
+                        ))}
+                    </datalist>
                     
                     {/* Invoice Meta */}
                     <div className="space-y-3">
@@ -253,7 +329,7 @@ const Invoice = ({ theme }) => {
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 mb-1">Customer Name</label>
-                                <input type="text" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="e.g. VISHAL KUMAR" className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none" />
+                                <input type="text" list="customersDatalist" name="customerName" value={formData.customerName} onChange={handleCustomerChange} placeholder="e.g. VISHAL KUMAR" className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -301,7 +377,7 @@ const Invoice = ({ theme }) => {
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-[10px] font-bold text-gray-500 mb-1">Model Name & Variant</label>
-                                <input type="text" name="modelName" value={formData.modelName} onChange={handleChange} className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none" />
+                                <input type="text" list="stocksDatalist" name="modelName" value={formData.modelName} onChange={handleModelChange} className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -333,7 +409,7 @@ const Invoice = ({ theme }) => {
                         <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-gray-100 pb-2">Pricing (Manual)</h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-[10px] font-bold text-gray-500 mb-1">Rate (Taxable Value)</label>
+                                <label className="block text-[10px] font-bold text-gray-500 mb-1">Total Amount (Inclusive GST)</label>
                                 <input type="number" name="rate" value={formData.rate} onChange={handleChange} className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-100 outline-none" />
                             </div>
                             <div>
