@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, Plus, Trash2, ArrowUpRight, ArrowDownRight, IndianRupee, Search, RefreshCw, AlertCircle, Users, ArrowLeft, Download, FileText } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
@@ -194,39 +194,72 @@ const Ledger = ({ theme }) => {
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    const tableColumn = ["Date", "Party / Account", "Description", "Category", "Method", "Debit", "Credit", "Balance"];
+    
+    // Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("STATEMENT OF ACCOUNT", 105, 20, { align: "center" });
+
+    doc.setFontSize(12);
+    if (activeView === 'partyDetail' && selectedParty) {
+      doc.text(`Party: ${selectedParty}`, 14, 35);
+    } else {
+      doc.text("Report: All Transactions", 14, 35);
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const dateText = (startDate || endDate) 
+      ? `Date Range: ${startDate || 'Start'} to ${endDate || 'End'}`
+      : `Date Range: All Time`;
+    doc.text(dateText, 14, 42);
+
+    doc.text(`Total Credits: Rs. ${displayCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 14, 49);
+    doc.text(`Total Debits: Rs. ${displayDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 14, 56);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Closing Balance: Rs. ${displayBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 14, 63);
+
+    const tableColumn = ["Date", "Description", "Ref/Method", "Debit (Out)", "Credit (In)", "Balance"];
     const tableRows = [];
 
-    dataToRender.forEach(tx => {
+    const chronologicalData = [...dataToRender].reverse();
+
+    chronologicalData.forEach(tx => {
       const txData = [
         new Date(tx.date).toLocaleDateString(),
-        tx.partyName || '-',
         tx.description,
-        tx.category,
         tx.paymentMethod || 'Cash',
-        tx.type === 'Debit' ? tx.amount.toFixed(2) : '-',
-        tx.type === 'Credit' ? tx.amount.toFixed(2) : '-',
-        (activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toFixed(2)
+        tx.type === 'Debit' ? Number(tx.amount).toFixed(2) : '',
+        tx.type === 'Credit' ? Number(tx.amount).toFixed(2) : '',
+        Number(activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toFixed(2)
       ];
       tableRows.push(txData);
     });
 
-    const title = activeView === 'partyDetail' && selectedParty ? `Ledger Report: ${selectedParty}` : 'Ledger Report: All Transactions';
-    
-    doc.text(title, 14, 15);
-    if (startDate || endDate) {
-      doc.setFontSize(10);
-      doc.text(`Period: ${startDate || 'Start'} to ${endDate || 'End'}`, 14, 22);
-    }
-    
-    doc.autoTable({
+    autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: (startDate || endDate) ? 26 : 20,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 23, 42] }
+      startY: 70,
+      styles: { fontSize: 9, font: "helvetica" },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        3: { halign: 'right', textColor: [225, 29, 72] }, // Debit
+        4: { halign: 'right', textColor: [5, 150, 105] }, // Credit
+        5: { halign: 'right', fontStyle: 'bold' }         // Balance
+      }
     });
     
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for(let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text(`Generated on ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
+      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
+    }
+
     doc.save(`Ledger_Report_${new Date().getTime()}.pdf`);
   };
 
