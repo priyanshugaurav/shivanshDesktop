@@ -195,30 +195,79 @@ const Ledger = ({ theme }) => {
   const handleExportPDF = () => {
     const doc = new jsPDF();
     
-    // Header
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("STATEMENT OF ACCOUNT", 105, 20, { align: "center" });
+    // Top Accent Line
+    doc.setFillColor(15, 23, 42); // slate-900
+    doc.rect(0, 0, doc.internal.pageSize.width, 6, "F");
 
-    doc.setFontSize(12);
-    if (activeView === 'partyDetail' && selectedParty) {
-      doc.text(`Party: ${selectedParty}`, 14, 35);
-    } else {
-      doc.text("Report: All Transactions", 14, 35);
-    }
+    // Company Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(15, 23, 42);
+    doc.text("SHIVANSH AUTO ENTERPRISES", 14, 22);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    const dateText = (startDate || endDate) 
-      ? `Date Range: ${startDate || 'Start'} to ${endDate || 'End'}`
-      : `Date Range: All Time`;
-    doc.text(dateText, 14, 42);
-
-    doc.text(`Total Credits: Rs. ${displayCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 14, 49);
-    doc.text(`Total Debits: Rs. ${displayDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 14, 56);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text("Official Ledger & Account Statement", 14, 28);
+    
+    // Statement Title (Right aligned)
     doc.setFont("helvetica", "bold");
-    doc.text(`Closing Balance: Rs. ${displayBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 14, 63);
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text("STATEMENT OF ACCOUNT", doc.internal.pageSize.width - 14, 22, { align: "right" });
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.width - 14, 28, { align: "right" });
 
+    // Divider Line
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.line(14, 35, doc.internal.pageSize.width - 14, 35);
+
+    // Info Box
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.roundedRect(14, 40, doc.internal.pageSize.width - 28, 25, 3, 3, "F");
+
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105); // slate-600
+    
+    // Column 1
+    doc.setFont("helvetica", "bold");
+    doc.text("Account Name:", 20, 48);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    doc.text(activeView === 'partyDetail' && selectedParty ? selectedParty : "All Transactions (Global)", 52, 48);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Period:", 20, 56);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(15, 23, 42);
+    const dateText = (startDate || endDate) ? `${startDate || 'Start'} to ${endDate || 'End'}` : "All Time";
+    doc.text(dateText, 52, 56);
+
+    // Column 2 (Summary Math)
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Total Received:", doc.internal.pageSize.width - 80, 48);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(5, 150, 105); // emerald-600
+    doc.text(`Rs. ${displayCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, doc.internal.pageSize.width - 45, 48);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(71, 85, 105);
+    doc.text("Total Paid:", doc.internal.pageSize.width - 80, 54);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(225, 29, 72); // rose-600
+    doc.text(`Rs. ${displayDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, doc.internal.pageSize.width - 45, 54);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(15, 23, 42);
+    doc.text("Net Balance:", doc.internal.pageSize.width - 80, 60);
+    doc.text(`Rs. ${displayBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, doc.internal.pageSize.width - 45, 60);
+
+    // Table
     const tableColumn = ["Date", "Description", "Ref/Method", "Debit (Out)", "Credit (In)", "Balance"];
     const tableRows = [];
 
@@ -229,9 +278,9 @@ const Ledger = ({ theme }) => {
         new Date(tx.date).toLocaleDateString(),
         tx.description,
         tx.paymentMethod || 'Cash',
-        tx.type === 'Debit' ? Number(tx.amount).toFixed(2) : '',
-        tx.type === 'Credit' ? Number(tx.amount).toFixed(2) : '',
-        Number(activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toFixed(2)
+        tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
+        tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
+        (activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })
       ];
       tableRows.push(txData);
     });
@@ -239,15 +288,16 @@ const Ledger = ({ theme }) => {
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 70,
-      styles: { fontSize: 9, font: "helvetica" },
-      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+      startY: 75,
+      styles: { fontSize: 9, font: "helvetica", cellPadding: 4 },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: {
-        3: { halign: 'right', textColor: [225, 29, 72] }, // Debit
-        4: { halign: 'right', textColor: [5, 150, 105] }, // Credit
-        5: { halign: 'right', fontStyle: 'bold' }         // Balance
-      }
+        3: { halign: 'right', textColor: [225, 29, 72] }, 
+        4: { halign: 'right', textColor: [5, 150, 105] }, 
+        5: { halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] }
+      },
+      margin: { top: 75 }
     });
     
     // Footer
@@ -255,12 +305,17 @@ const Ledger = ({ theme }) => {
     for(let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(`Generated on ${new Date().toLocaleString()}`, 14, doc.internal.pageSize.height - 10);
-      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 10);
+      doc.setTextColor(148, 163, 184); // slate-400
+      doc.setFont("helvetica", "normal");
+      
+      doc.setDrawColor(226, 232, 240);
+      doc.line(14, doc.internal.pageSize.height - 15, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 15);
+      
+      doc.text("Shivansh Auto Enterprises - Official Record", 14, doc.internal.pageSize.height - 8);
+      doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 8);
     }
 
-    doc.save(`Ledger_Report_${new Date().getTime()}.pdf`);
+    doc.save(`Shivansh_Ledger_${new Date().getTime()}.pdf`);
   };
 
   const handleExportExcel = () => {
