@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BookOpen, Plus, Trash2, ArrowUpRight, ArrowDownRight, IndianRupee, Search, RefreshCw, AlertCircle, Users, ArrowLeft } from 'lucide-react';
+import { BookOpen, Plus, Trash2, ArrowUpRight, ArrowDownRight, IndianRupee, Search, RefreshCw, AlertCircle, Users, ArrowLeft, Download, FileText } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
@@ -12,6 +15,8 @@ const Ledger = ({ theme }) => {
   const [activeView, setActiveView] = useState('all'); // 'all', 'parties', 'partyDetail'
   const [selectedParty, setSelectedParty] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -154,26 +159,94 @@ const Ledger = ({ theme }) => {
     return computed.reverse();
   }, [transactions, selectedParty]);
 
+  const dateFilter = (t) => {
+    if (!startDate && !endDate) return true;
+    const txDate = new Date(t.date).getTime();
+    const start = startDate ? new Date(startDate).getTime() : 0;
+    const end = endDate ? new Date(endDate).getTime() + 86400000 : Infinity; // add 1 day to include end date fully
+    return txDate >= start && txDate <= end;
+  };
+
   const filteredTransactions = transactions.filter(t => 
-    t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.partyName && t.partyName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()))
+    dateFilter(t) &&
+    (t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     (t.partyName && t.partyName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+     (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const filteredPartyTransactions = partySpecificTransactions.filter(t => 
-    t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()))
+    dateFilter(t) &&
+    (t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase())))
   );
 
   const filteredParties = partiesData.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const displayCredits = activeView === 'partyDetail' && selectedParty ? partiesData.find(p => p.name === selectedParty)?.totalCredit || 0 : totalCredits;
-  const displayDebits = activeView === 'partyDetail' && selectedParty ? partiesData.find(p => p.name === selectedParty)?.totalDebit || 0 : totalDebits;
-  const displayBalance = activeView === 'partyDetail' && selectedParty ? partiesData.find(p => p.name === selectedParty)?.balance || 0 : currentBalance;
-
   const dataToRender = activeView === 'partyDetail' ? filteredPartyTransactions : filteredTransactions;
+
+  const displayCredits = dataToRender.filter(t => t.type === 'Credit').reduce((acc, curr) => acc + curr.amount, 0);
+  const displayDebits = dataToRender.filter(t => t.type === 'Debit').reduce((acc, curr) => acc + curr.amount, 0);
+  const displayBalance = dataToRender.length > 0 
+    ? (activeView === 'partyDetail' ? dataToRender[0].partyRunningBalance : dataToRender[0].balance)
+    : 0;
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Date", "Party / Account", "Description", "Category", "Method", "Debit", "Credit", "Balance"];
+    const tableRows = [];
+
+    dataToRender.forEach(tx => {
+      const txData = [
+        new Date(tx.date).toLocaleDateString(),
+        tx.partyName || '-',
+        tx.description,
+        tx.category,
+        tx.paymentMethod || 'Cash',
+        tx.type === 'Debit' ? tx.amount.toFixed(2) : '-',
+        tx.type === 'Credit' ? tx.amount.toFixed(2) : '-',
+        (activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toFixed(2)
+      ];
+      tableRows.push(txData);
+    });
+
+    const title = activeView === 'partyDetail' && selectedParty ? `Ledger Report: ${selectedParty}` : 'Ledger Report: All Transactions';
+    
+    doc.text(title, 14, 15);
+    if (startDate || endDate) {
+      doc.setFontSize(10);
+      doc.text(`Period: ${startDate || 'Start'} to ${endDate || 'End'}`, 14, 22);
+    }
+    
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: (startDate || endDate) ? 26 : 20,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+    
+    doc.save(`Ledger_Report_${new Date().getTime()}.pdf`);
+  };
+
+  const handleExportExcel = () => {
+    const wsData = dataToRender.map(tx => ({
+      Date: new Date(tx.date).toLocaleDateString(),
+      "Party / Account": tx.partyName || '-',
+      Description: tx.description,
+      Category: tx.category,
+      Method: tx.paymentMethod || 'Cash',
+      "Debit (Out)": tx.type === 'Debit' ? tx.amount : 0,
+      "Credit (In)": tx.type === 'Credit' ? tx.amount : 0,
+      Balance: activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ledger");
+    XLSX.writeFile(wb, `Ledger_Report_${new Date().getTime()}.xlsx`);
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -307,16 +380,44 @@ const Ledger = ({ theme }) => {
       {(activeView === 'all' || activeView === 'partyDetail') && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
         {/* Table Toolbar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-50/50">
-          <div className="relative w-full sm:w-80">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search description or category..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all"
-            />
+        <div className="p-4 border-b border-slate-100 flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-slate-50/50">
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input 
+                type="text" 
+                placeholder="Search description or category..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-200 transition-all"
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <input 
+                type="date" 
+                value={startDate} 
+                onChange={e => setStartDate(e.target.value)} 
+                className="w-full sm:w-32 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-200 text-slate-600" 
+                title="Start Date"
+              />
+              <span className="text-slate-400 text-xs">to</span>
+              <input 
+                type="date" 
+                value={endDate} 
+                onChange={e => setEndDate(e.target.value)} 
+                className="w-full sm:w-32 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-slate-200 text-slate-600" 
+                title="End Date"
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <button onClick={handleExportExcel} className="flex-1 lg:flex-none px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-emerald-600 hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2">
+              <Download className="h-4 w-4" /> Excel
+            </button>
+            <button onClick={handleExportPDF} className="flex-1 lg:flex-none px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center gap-2">
+              <FileText className="h-4 w-4" /> PDF
+            </button>
           </div>
         </div>
 
