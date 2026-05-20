@@ -5,6 +5,7 @@ const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
 const Ledger = ({ theme }) => {
   const [transactions, setTransactions] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -14,7 +15,9 @@ const Ledger = ({ theme }) => {
     description: '',
     category: 'General',
     type: 'Credit',
-    amount: ''
+    amount: '',
+    partyName: '',
+    paymentMethod: 'Cash'
   });
 
   const categories = ['General', 'Sales', 'Expense', 'Payroll', 'Asset', 'Liability'];
@@ -35,8 +38,22 @@ const Ledger = ({ theme }) => {
     }
   };
 
+  const fetchCustomers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/customers`, { headers: { 'Authorization': token } });
+      if (res.ok) {
+        const data = await res.json();
+        setCustomers(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch customers:', error);
+    }
+  };
+
   useEffect(() => {
     fetchLedger();
+    fetchCustomers();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -58,7 +75,15 @@ const Ledger = ({ theme }) => {
       });
       if (res.ok) {
         setShowModal(false);
-        setFormData({ ...formData, description: '', amount: '' });
+        setFormData({
+          date: new Date().toISOString().split('T')[0],
+          description: '',
+          category: 'General',
+          type: 'Credit',
+          amount: '',
+          partyName: '',
+          paymentMethod: 'Cash'
+        });
         fetchLedger();
       } else {
         const error = await res.json();
@@ -91,7 +116,9 @@ const Ledger = ({ theme }) => {
 
   const filteredTransactions = transactions.filter(t => 
     t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    t.category.toLowerCase().includes(searchTerm.toLowerCase())
+    t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.partyName && t.partyName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -170,8 +197,10 @@ const Ledger = ({ theme }) => {
             <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
               <tr>
                 <th className="px-6 py-4 font-bold">Date</th>
+                <th className="px-6 py-4 font-bold">Party / Account</th>
                 <th className="px-6 py-4 font-bold">Description</th>
                 <th className="px-6 py-4 font-bold">Category</th>
+                <th className="px-6 py-4 font-bold">Method</th>
                 <th className="px-6 py-4 font-bold text-right text-rose-500">Debit (Out)</th>
                 <th className="px-6 py-4 font-bold text-right text-emerald-500">Credit (In)</th>
                 <th className="px-6 py-4 font-bold text-right">Balance</th>
@@ -196,10 +225,16 @@ const Ledger = ({ theme }) => {
                 filteredTransactions.map((tx) => (
                   <tr key={tx._id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4 text-slate-600 font-medium">{new Date(tx.date).toLocaleDateString()}</td>
-                    <td className="px-6 py-4 text-slate-800 font-semibold">{tx.description}</td>
+                    <td className="px-6 py-4 text-slate-800 font-semibold">{tx.partyName || '-'}</td>
+                    <td className="px-6 py-4 text-slate-700 font-medium">{tx.description}</td>
                     <td className="px-6 py-4">
                       <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wide">
                         {tx.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+                        {tx.paymentMethod || 'Cash'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
@@ -258,6 +293,39 @@ const Ledger = ({ theme }) => {
                   <IndianRupee className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input type="number" step="0.01" placeholder="0.00" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-200" required />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Party / Account Name</label>
+                <input 
+                  type="text" 
+                  list="customers-list" 
+                  placeholder="Select customer or enter custom name..." 
+                  value={formData.partyName} 
+                  onChange={e => setFormData({...formData, partyName: e.target.value})} 
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-200" 
+                />
+                <datalist id="customers-list">
+                  {customers.map(c => {
+                    const fullName = `${c.personal?.firstName || ''} ${c.personal?.lastName || ''}`.trim();
+                    return <option key={c._id} value={fullName} />;
+                  })}
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Payment Method</label>
+                <select 
+                  value={formData.paymentMethod} 
+                  onChange={e => setFormData({...formData, paymentMethod: e.target.value})} 
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Card">Card</option>
+                  <option value="Cheque">Cheque</option>
+                </select>
               </div>
 
               <div>

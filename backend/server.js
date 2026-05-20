@@ -254,6 +254,8 @@ const LedgerSchema = new mongoose.Schema({
   type: { type: String, enum: ['Credit', 'Debit'], required: true },
   amount: { type: Number, required: true },
   balance: { type: Number, required: true }, // Running balance
+  partyName: { type: String, default: '' },
+  paymentMethod: { type: String, default: 'Cash' },
   createdAt: { type: Date, default: Date.now }
 });
 const Ledger = mongoose.models.Ledger || mongoose.model('Ledger', LedgerSchema);
@@ -1459,7 +1461,7 @@ app.get('/api/ledger', verifyToken, async (req, res) => {
 
 app.post('/api/ledger', verifyToken, async (req, res) => {
   try {
-    const { date, description, category, type, amount } = req.body;
+    const { date, description, category, type, amount, partyName, paymentMethod } = req.body;
     
     // Calculate running balance based on the most recent entry
     const lastEntry = await Ledger.findOne().sort({ date: -1, createdAt: -1 });
@@ -1475,7 +1477,9 @@ app.post('/api/ledger', verifyToken, async (req, res) => {
       category: category || 'General',
       type,
       amount: Number(amount),
-      balance: newBalance
+      balance: newBalance,
+      partyName: partyName || '',
+      paymentMethod: paymentMethod || 'Cash'
     });
     res.status(201).json(entry);
   } catch (error) {
