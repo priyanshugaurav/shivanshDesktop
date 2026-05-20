@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Plus, Trash2, ArrowUpRight, ArrowDownRight, IndianRupee, Search, RefreshCw, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { BookOpen, Plus, Trash2, ArrowUpRight, ArrowDownRight, IndianRupee, Search, RefreshCw, AlertCircle, Users, ArrowLeft } from 'lucide-react';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
@@ -9,6 +9,8 @@ const Ledger = ({ theme }) => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [activeView, setActiveView] = useState('all'); // 'all', 'parties', 'partyDetail'
+  const [selectedParty, setSelectedParty] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   const [formData, setFormData] = useState({
@@ -118,12 +120,60 @@ const Ledger = ({ theme }) => {
   const totalCredits = transactions.filter(t => t.type === 'Credit').reduce((acc, curr) => acc + curr.amount, 0);
   const totalDebits = transactions.filter(t => t.type === 'Debit').reduce((acc, curr) => acc + curr.amount, 0);
 
+  const partiesData = useMemo(() => {
+    const parties = {};
+    transactions.forEach(tx => {
+      const pName = (tx.partyName || '').trim() || 'Unspecified / Manual';
+      if (!parties[pName]) {
+        parties[pName] = { name: pName, totalCredit: 0, totalDebit: 0, count: 0 };
+      }
+      if (tx.type === 'Credit') parties[pName].totalCredit += tx.amount;
+      if (tx.type === 'Debit') parties[pName].totalDebit += tx.amount;
+      parties[pName].count += 1;
+    });
+    return Object.values(parties).map(p => ({
+      ...p,
+      balance: p.totalCredit - p.totalDebit
+    })).sort((a, b) => b.balance - a.balance);
+  }, [transactions]);
+
+  const partySpecificTransactions = useMemo(() => {
+    if (!selectedParty) return [];
+    const pNameMatches = (tx) => {
+      if (selectedParty === 'Unspecified / Manual') return !(tx.partyName || '').trim();
+      return (tx.partyName || '').trim() === selectedParty;
+    };
+    const txs = transactions.filter(pNameMatches);
+    const sortedAsc = [...txs].reverse(); 
+    let runningBalance = 0;
+    const computed = sortedAsc.map(tx => {
+      if (tx.type === 'Credit') runningBalance += tx.amount;
+      if (tx.type === 'Debit') runningBalance -= tx.amount;
+      return { ...tx, partyRunningBalance: runningBalance };
+    });
+    return computed.reverse();
+  }, [transactions, selectedParty]);
+
   const filteredTransactions = transactions.filter(t => 
     t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
     t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (t.partyName && t.partyName.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const filteredPartyTransactions = partySpecificTransactions.filter(t => 
+    t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (t.paymentMethod && t.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const filteredParties = partiesData.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const displayCredits = activeView === 'partyDetail' && selectedParty ? partiesData.find(p => p.name === selectedParty)?.totalCredit || 0 : totalCredits;
+  const displayDebits = activeView === 'partyDetail' && selectedParty ? partiesData.find(p => p.name === selectedParty)?.totalDebit || 0 : totalDebits;
+  const displayBalance = activeView === 'partyDetail' && selectedParty ? partiesData.find(p => p.name === selectedParty)?.balance || 0 : currentBalance;
+
+  const dataToRender = activeView === 'partyDetail' ? filteredPartyTransactions : filteredTransactions;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -154,7 +204,7 @@ const Ledger = ({ theme }) => {
           </div>
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase">Total Credits (In)</p>
-            <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-1"><IndianRupee className="h-5 w-5" />{totalCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+            <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-1"><IndianRupee className="h-5 w-5" />{displayCredits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
           </div>
         </div>
 
@@ -164,23 +214,98 @@ const Ledger = ({ theme }) => {
           </div>
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase">Total Debits (Out)</p>
-            <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-1"><IndianRupee className="h-5 w-5" />{totalDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+            <h3 className="text-2xl font-bold text-slate-800 flex items-center gap-1"><IndianRupee className="h-5 w-5" />{displayDebits.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
           </div>
         </div>
 
-        <div className={`rounded-2xl p-6 border shadow-sm flex items-center gap-4 ${currentBalance >= 0 ? 'bg-slate-900 border-slate-800' : 'bg-rose-600 border-rose-700'}`}>
+        <div className={`rounded-2xl p-6 border shadow-sm flex items-center gap-4 ${displayBalance >= 0 ? 'bg-slate-900 border-slate-800' : 'bg-rose-600 border-rose-700'}`}>
           <div className="h-12 w-12 rounded-xl bg-white/10 text-white flex items-center justify-center">
             <BookOpen className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-xs font-bold text-white/70 uppercase">Current Balance</p>
-            <h3 className="text-2xl font-bold text-white flex items-center gap-1"><IndianRupee className="h-5 w-5" />{currentBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+            <p className="text-xs font-bold text-white/70 uppercase">{activeView === 'partyDetail' ? 'Net Balance' : 'Current Balance'}</p>
+            <h3 className="text-2xl font-bold text-white flex items-center gap-1"><IndianRupee className="h-5 w-5" />{displayBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
           </div>
         </div>
       </div>
 
-      {/* Main Table Area */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+      {/* View Toggle */}
+      {activeView !== 'partyDetail' && (
+        <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+          <button 
+            onClick={() => setActiveView('all')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${activeView === 'all' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <BookOpen className="h-4 w-4" /> All Transactions
+          </button>
+          <button 
+            onClick={() => setActiveView('parties')}
+            className={`px-4 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 ${activeView === 'parties' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <Users className="h-4 w-4" /> Parties & Accounts
+          </button>
+        </div>
+      )}
+
+      {activeView === 'partyDetail' && (
+        <div className="flex items-center justify-between bg-slate-50 border border-slate-100 p-4 rounded-xl">
+           <div className="flex items-center gap-4">
+             <button onClick={() => { setActiveView('parties'); setSelectedParty(null); }} className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors">
+               <ArrowLeft className="h-4 w-4" />
+             </button>
+             <div>
+               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Party Ledger</p>
+               <h2 className="text-lg font-bold text-slate-800">{selectedParty}</h2>
+             </div>
+           </div>
+        </div>
+      )}
+
+      {/* Parties Grid View */}
+      {activeView === 'parties' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredParties.map(p => (
+            <div 
+              key={p.name} 
+              onClick={() => { setSelectedParty(p.name); setActiveView('partyDetail'); }}
+              className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all cursor-pointer group flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-slate-800 group-hover:text-white transition-colors">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <h3 className="font-bold text-slate-800 truncate">{p.name}</h3>
+                    <p className="text-xs font-medium text-slate-500">{p.count} Transactions</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div className="bg-slate-50 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Received</p>
+                    <p className="text-sm font-bold text-emerald-600">₹{p.totalCredit.toLocaleString('en-IN')}</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Paid</p>
+                    <p className="text-sm font-bold text-rose-600">₹{p.totalDebit.toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+              </div>
+              <div className={`rounded-xl p-3 flex items-center justify-between ${p.balance >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                <span className="text-xs font-bold uppercase">Net Balance</span>
+                <span className="font-bold">₹{p.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          ))}
+          {filteredParties.length === 0 && (
+            <div className="col-span-full py-12 text-center text-slate-400">No parties found matching your search.</div>
+          )}
+        </div>
+      )}
+
+      {/* Main Table Area for All Transactions & Party Details */}
+      {(activeView === 'all' || activeView === 'partyDetail') && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
         {/* Table Toolbar */}
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-50/50">
           <div className="relative w-full sm:w-80">
@@ -214,11 +339,11 @@ const Ledger = ({ theme }) => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-slate-400 font-medium">Loading transactions...</td>
+                  <td colSpan="9" className="px-6 py-12 text-center text-slate-400 font-medium">Loading transactions...</td>
                 </tr>
-              ) : filteredTransactions.length === 0 ? (
+              ) : dataToRender.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
+                  <td colSpan="9" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center text-slate-400">
                       <AlertCircle className="h-8 w-8 mb-2 opacity-50" />
                       <p className="font-medium">No transactions found.</p>
@@ -226,7 +351,7 @@ const Ledger = ({ theme }) => {
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((tx) => (
+                dataToRender.map((tx) => (
                   <tr key={tx._id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4 text-slate-600 font-medium">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-slate-800 font-semibold">{tx.partyName || '-'}</td>
@@ -248,7 +373,9 @@ const Ledger = ({ theme }) => {
                       {tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-slate-800">
-                      {tx.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {activeView === 'partyDetail' 
+                        ? tx.partyRunningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                        : tx.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button 
@@ -266,6 +393,7 @@ const Ledger = ({ theme }) => {
           </table>
         </div>
       </div>
+      )}
 
       {/* Add Transaction Modal */}
       {showModal && (
