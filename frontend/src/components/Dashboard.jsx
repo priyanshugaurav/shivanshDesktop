@@ -4,7 +4,7 @@ import {
     Home as HomeIcon, // Aliased to avoid conflict with Home component
     BarChart2, Settings, LogOut, Command,
     LifeBuoy, Bell, Search, Check, ChevronDown, Slash,
-    MessageSquare, CheckCircle, PieChart, FileText, Package, Users, CreditCard, Truck
+    MessageSquare, CheckCircle, PieChart, FileText, Package, Users, CreditCard, Truck, BookOpen
 } from 'lucide-react';
 
 // --- COMPONENT IMPORTS ---
@@ -20,6 +20,7 @@ import AddVehicle from './AddVehicle';
 import Expense from './Expense';
 import Home from './Home'; // Imported Home Component
 import Invoice from './Invoice';
+import Ledger from './Ledger';
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
@@ -64,6 +65,7 @@ const Dashboard = () => {
                 { id: 'add_vehicle', label: 'Add Vehicle/Permit', icon: Truck },
                 { id: 'employees', label: 'Staff & Payroll', icon: Users },
                 { id: 'expenses', label: 'Expense Manager', icon: CreditCard },
+                { id: 'ledger', label: 'Ledger Book', icon: BookOpen },
                 { id: 'invoice', label: 'Invoice', icon: FileText },
             ]
         },
@@ -96,7 +98,7 @@ const Dashboard = () => {
 
     // --- CONTENT RENDERING HELPER ---
     const renderContent = () => {
-        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice'];
+        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice', 'ledger'];
         
         if (!validTabs.includes(activeTab)) {
              return (
@@ -124,8 +126,9 @@ const Dashboard = () => {
                 {visitedTabs.includes('employees') && <div className={activeTab === 'employees' ? 'block' : 'hidden'}><Employee theme={t} /></div>}
                 {visitedTabs.includes('dues') && <div className={activeTab === 'dues' ? 'block' : 'hidden'}><Dues theme={t} /></div>}
                 {visitedTabs.includes('add_vehicle') && <div className={activeTab === 'add_vehicle' ? 'block' : 'hidden'}><AddVehicle theme={t} /></div>}
-                {visitedTabs.includes('expenses') && <div className={activeTab === 'expenses' ? 'block' : 'hidden'}><Expense theme={t} /></div>}
-                {visitedTabs.includes('invoice') && <div className={activeTab === 'invoice' ? 'block' : 'hidden'}><Invoice theme={t} /></div>}
+                { visitedTabs.includes('expenses') && <div className={activeTab === 'expenses' ? 'block' : 'hidden'}><Expense theme={t} /></div>}
+                { visitedTabs.includes('ledger') && <div className={activeTab === 'ledger' ? 'block' : 'hidden'}><Ledger theme={t} /></div>}
+                { visitedTabs.includes('invoice') && <div className={activeTab === 'invoice' ? 'block' : 'hidden'}><Invoice theme={t} /></div>}
             </>
         );
     };

@@ -246,6 +246,18 @@ const ExpenseSchema = new mongoose.Schema({
 });
 const Expense = mongoose.models.Expense || mongoose.model('Expense', ExpenseSchema);
 
+// 6.8 LEDGER SCHEMA (Business Transactions)
+const LedgerSchema = new mongoose.Schema({
+  date: { type: Date, required: true },
+  description: { type: String, required: true },
+  category: { type: String, default: 'General' },
+  type: { type: String, enum: ['Credit', 'Debit'], required: true },
+  amount: { type: Number, required: true },
+  balance: { type: Number, required: true }, // Running balance
+  createdAt: { type: Date, default: Date.now }
+});
+const Ledger = mongoose.models.Ledger || mongoose.model('Ledger', LedgerSchema);
+
 // 7. NEW INVENTORY SCHEMAS (Two-Tier)
 
 // Tier 1: Vehicle Model (Catalog Name)
@@ -1434,6 +1446,54 @@ app.use((req, res) => {
 
 
 // Start server only when run directly (not as a serverless function)
+
+// --- LEDGER ROUTES ---
+app.get('/api/ledger', verifyToken, async (req, res) => {
+  try {
+    const ledger = await Ledger.find().sort({ date: -1, createdAt: -1 });
+    res.json(ledger);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ledger', verifyToken, async (req, res) => {
+  try {
+    const { date, description, category, type, amount } = req.body;
+    
+    // Calculate running balance based on the most recent entry
+    const lastEntry = await Ledger.findOne().sort({ date: -1, createdAt: -1 });
+    let previousBalance = lastEntry ? lastEntry.balance : 0;
+    
+    let newBalance = previousBalance;
+    if (type === 'Credit') newBalance += Number(amount);
+    if (type === 'Debit') newBalance -= Number(amount);
+    
+    const entry = await Ledger.create({
+      date,
+      description,
+      category: category || 'General',
+      type,
+      amount: Number(amount),
+      balance: newBalance
+    });
+    res.status(201).json(entry);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/ledger/:id', verifyToken, async (req, res) => {
+  try {
+    // Note: Deleting a past entry technically requires recalculating balances for all subsequent entries. 
+    // To keep it simple, we just allow deletion for cleanup. You might want to restrict this in production.
+    await Ledger.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Ledger entry deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
