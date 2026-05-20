@@ -7,6 +7,7 @@ const Ledger = ({ theme }) => {
   const [transactions, setTransactions] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -63,6 +64,7 @@ const Ledger = ({ theme }) => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/ledger`, {
@@ -91,6 +93,8 @@ const Ledger = ({ theme }) => {
       }
     } catch (error) {
       console.error('Error adding transaction:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -341,8 +345,14 @@ const Ledger = ({ theme }) => {
               </div>
 
               <div className="pt-4 flex gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">Cancel</button>
-                <button type="submit" className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold text-white shadow-md hover:shadow-lg transition-all ${theme.primary}`}>Save Entry</button>
+                <button type="button" onClick={() => setShowModal(false)} disabled={isSubmitting} className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50">Cancel</button>
+                <button type="submit" disabled={isSubmitting} className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 ${theme.primary} disabled:opacity-70 disabled:cursor-not-allowed`}>
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" /> Saving...
+                    </>
+                  ) : 'Save Entry'}
+                </button>
               </div>
             </form>
           </div>
