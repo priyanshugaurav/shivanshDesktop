@@ -1434,21 +1434,6 @@ app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
   }
 });
 
-// Catch-all: serve index.html for all non-API routes (React Router support)
-// Fixed for Express 5: using app.use instead of app.get('*') to avoid PathError
-app.use((req, res) => {
-  if (req.path.startsWith('/api')) {
-    return res.status(404).json({ error: 'API route not found' });
-  }
-  res.sendFile(path.join(frontendPath, 'index.html'), err => {
-    if (err) res.status(404).send('Frontend not built or missing.');
-  });
-});
-
-
-
-// Start server only when run directly (not as a serverless function)
-
 // --- LEDGER ROUTES ---
 app.get('/api/ledger', verifyToken, async (req, res) => {
   try {
@@ -1489,14 +1474,27 @@ app.post('/api/ledger', verifyToken, async (req, res) => {
 
 app.delete('/api/ledger/:id', verifyToken, async (req, res) => {
   try {
-    // Note: Deleting a past entry technically requires recalculating balances for all subsequent entries. 
-    // To keep it simple, we just allow deletion for cleanup. You might want to restrict this in production.
     await Ledger.findByIdAndDelete(req.params.id);
     res.json({ message: 'Ledger entry deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Catch-all: serve index.html for all non-API routes (React Router support)
+// Fixed for Express 5: using app.use instead of app.get('*') to avoid PathError
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'), err => {
+    if (err) res.status(404).send('Frontend not built or missing.');
+  });
+});
+
+
+
+// Start server only when run directly (not as a serverless function)
 
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
