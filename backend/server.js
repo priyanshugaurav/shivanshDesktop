@@ -125,6 +125,7 @@ const AgreementSchema = new mongoose.Schema({
     insurance: String,
     rto: String,
     permit: String,
+    registration: String,
     discount: String,
     onRoadPrice: String,
     landingPrice: String,
@@ -149,7 +150,9 @@ const AgreementSchema = new mongoose.Schema({
     amount: String
   },
   payment: {
+    downPaymentAuto: String,
     downPayment: String,
+    discount: String,
     paidAmount: String,
     type: { type: String }, 
     date: Date,

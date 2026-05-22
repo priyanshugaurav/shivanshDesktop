@@ -403,10 +403,10 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
                           <Field label="Insurance" value={data.model?.insurance} />
                           {data.agreementType === 'TYPE2' ? (
                               <>
-                                  <Field label="Permit" value={data.model?.permit} />
+                                  <Field label="Registration" value={data.model?.registration} />
                                   <div className="bg-slate-100 rounded-lg p-3 border border-slate-200">
                                       <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Cost Price</span>
-                                      <span className="block text-sm font-bold text-slate-700 font-mono">{(parseFloat(data.model?.insurance||0) + parseFloat(data.model?.permit||0) + parseFloat(data.model?.exShowroom||0)).toFixed(2)}</span>
+                                      <span className="block text-sm font-bold text-slate-700 font-mono">{(parseFloat(data.model?.insurance||0) + parseFloat(data.model?.registration||0) + parseFloat(data.model?.exShowroom||0)).toFixed(2)}</span>
                                   </div>
                                   <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-100">
                                       <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Selling Price</span>
@@ -473,6 +473,8 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
 
                   <Section title="Payment Details" icon={Calculator}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Field label="Customer Down Payment (Auto)" value={data.payment?.downPaymentAuto || (data.payment?.downPayment && data.payment?.discount ? (parseFloat(data.payment.downPayment) + parseFloat(data.payment.discount)).toFixed(2) : data.payment?.downPayment)} />
+                            <Field label="Discount" value={data.payment?.discount || '0'} />
                             <Field label="Customer Down Payment" value={data.payment?.downPayment} />
                             <Field label="Customer Paid Amount" value={data.payment?.paidAmount} />
                             <Field label="Payment Type" value={data.payment?.type} />
@@ -530,11 +532,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     const [formData, setFormData] = useState(initialData || {
       agreementType: 'NORMAL',
       agreementId: '',
-      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00', sellingPrice: '0.00' },
+      model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', registration: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00', sellingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
       dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
-      payment: { downPayment: '', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
+      payment: { downPaymentAuto: '0.00', downPayment: '', discount: '0', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
       other: { amount: '', remark: '' },
       dse: { name: '', commission: '', dseCommission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' }
     });
@@ -633,20 +635,22 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const insurance = safe(formData.model.insurance);
         const rto = safe(formData.model.rto);
         const permit = safe(formData.model.permit);
+        const registration = safe(formData.model.registration);
         const discount = safe(formData.model.discount);
         const bankFee = safe(formData.loan.processingFee);
         const loanAmt = safe(formData.loan.amount);
         const brokerAmt = safe(formData.broker.amount);
         const otherAmt = safe(formData.other.amount);
         const landingPrice = safe(formData.model.landingPrice);
+        const paymentDiscount = safe(formData.payment.discount);
 
         let onRoadPrice, netProfit;
 
         if (formData.agreementType === 'TYPE2') {
-            const costPrice = insurance + permit + exShowroom;
+            const costPrice = insurance + registration + exShowroom;
             const sellingPrice = safe(formData.model.sellingPrice);
             onRoadPrice = sellingPrice.toFixed(2);
-            netProfit = (sellingPrice - costPrice - brokerAmt - otherAmt - bankFee).toFixed(2);
+            netProfit = (sellingPrice - costPrice - brokerAmt - otherAmt).toFixed(2);
         } else {
             onRoadPrice = (exShowroom + insurance + rto + permit - discount).toFixed(2);
             netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
@@ -656,7 +660,9 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const dtoTotal = formData.agreementType === 'TYPE2' ? '0.00' : rto.toFixed(2); 
         
         // 4. Down Payment (Manual logic from user: On Road - Loan)
-        const downPayment = (safe(onRoadPrice) - loanAmt).toFixed(2);
+        const downPaymentAutoVal = (safe(onRoadPrice) - loanAmt + (formData.agreementType === 'TYPE2' ? bankFee : 0));
+        const downPaymentAuto = downPaymentAutoVal.toFixed(2);
+        const downPayment = (downPaymentAutoVal - paymentDiscount).toFixed(2);
         
         // 5. Dues (Down payment - Paid amount)
         const paidAmt = safe(formData.payment.paidAmount);
@@ -671,6 +677,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const needsUpdate = (
             formData.model.onRoadPrice !== onRoadPrice ||
             formData.dto.total !== dtoTotal ||
+            formData.payment.downPaymentAuto !== downPaymentAuto ||
             formData.payment.downPayment !== downPayment ||
             formData.payment.dues !== dues ||
             formData.payment.netDues !== dues || // Syncing net dues initially too
@@ -686,6 +693,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                 dto: { ...prev.dto, total: dtoTotal },
                 payment: { 
                     ...prev.payment, 
+                    downPaymentAuto,
                     downPayment, 
                     dues, 
                     netDues: (prev.payment.netDues === prev.payment.dues || !initialData) ? dues : prev.payment.netDues 
@@ -694,10 +702,10 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             }));
         }
     }, [
-        formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit, formData.model.discount,
+        formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit, formData.model.registration, formData.model.discount,
         formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit,
         formData.loan.processingFee, formData.loan.amount,
-        formData.payment.paidAmount,
+        formData.payment.paidAmount, formData.payment.discount,
         formData.broker.amount, formData.other.amount,
         formData.dse.commission, formData.dse.dseCommission,
         formData.model.landingPrice, formData.agreementType, formData.model.sellingPrice
@@ -792,8 +800,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
               <form className="p-6 md:p-8 space-y-8" onSubmit={e => e.preventDefault()}>
                   <div>
                       <div className="flex items-center gap-4 mb-6">
-                           <button type="button" onClick={() => handleChange('agreementType', 'NORMAL')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'NORMAL' || !formData.agreementType ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Normal Calc</button>
-                           <button type="button" onClick={() => handleChange('agreementType', 'TYPE2')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'TYPE2' ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Cost vs Selling Price</button>
+                           <button type="button" onClick={() => handleChange('agreementType', 'NORMAL')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'NORMAL' || !formData.agreementType ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Bajaj Entry</button>
+                           <button type="button" onClick={() => handleChange('agreementType', 'TYPE2')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'TYPE2' ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>EV Entry</button>
                       </div>
 
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Car className="h-4 w-4 text-slate-400" /> Agreement & Model Details</h3>
@@ -809,10 +817,10 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                           
                           {formData.agreementType === 'TYPE2' ? (
                                <>
-                                   <Input label="Permit" value={formData.model.permit} onChange={v => handleDeepChange('model', 'permit', v)} theme={theme} />
+                                   <Input label="Registration" value={formData.model.registration} onChange={v => handleDeepChange('model', 'registration', v)} theme={theme} />
                                    <div className="md:col-span-1">
                                        <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Cost Price (Auto)</label>
-                                       <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{(parseFloat(formData.model.insurance||0) + parseFloat(formData.model.permit||0) + parseFloat(formData.model.exShowroom||0)).toFixed(2)}</div>
+                                       <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900">{(parseFloat(formData.model.insurance||0) + parseFloat(formData.model.registration||0) + parseFloat(formData.model.exShowroom||0)).toFixed(2)}</div>
                                    </div>
                                    <Input label="Selling Price" value={formData.model.sellingPrice} onChange={v => handleDeepChange('model', 'sellingPrice', v)} theme={theme} />
                                </>
@@ -889,6 +897,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="space-y-1">
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Customer Down Payment (Auto)</label>
+                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.downPaymentAuto || '0.00'}</div>
+                          </div>
+                          <Input label="Discount" value={formData.payment.discount} onChange={v => handleDeepChange('payment', 'discount', v)} theme={theme} />
+                          <div className="space-y-1">
+                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Customer Down Payment</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.downPayment}</div>
                           </div>
                           <Input label="Customer Paid Amount" value={formData.payment.paidAmount} onChange={v => handleDeepChange('payment', 'paidAmount', v)} theme={theme} />
