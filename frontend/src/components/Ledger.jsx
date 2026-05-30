@@ -268,7 +268,7 @@ const Ledger = ({ theme }) => {
     doc.text(`Rs. ${displayBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, doc.internal.pageSize.width - 45, 60);
 
     // Table
-    const tableColumn = ["Date", "Description", "Ref/Method", "Debit (Out)", "Credit (In)", "Balance"];
+    const tableColumn = ["Date", "Description", "Ref/Method", "Credit (In)", "Debit (Out)", "Balance"];
     const tableRows = [];
 
     const chronologicalData = [...dataToRender].reverse();
@@ -278,8 +278,8 @@ const Ledger = ({ theme }) => {
         new Date(tx.date).toLocaleDateString(),
         tx.description,
         tx.paymentMethod || 'Cash',
-        tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
         tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
+        tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
         (activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })
       ];
       tableRows.push(txData);
@@ -293,8 +293,8 @@ const Ledger = ({ theme }) => {
       headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: {
-        3: { halign: 'right', textColor: [225, 29, 72] }, 
-        4: { halign: 'right', textColor: [5, 150, 105] }, 
+        3: { halign: 'right', textColor: [5, 150, 105] }, 
+        4: { halign: 'right', textColor: [225, 29, 72] }, 
         5: { halign: 'right', fontStyle: 'bold', textColor: [15, 23, 42] }
       },
       margin: { top: 75 }
@@ -325,8 +325,8 @@ const Ledger = ({ theme }) => {
       Description: tx.description,
       Category: tx.category,
       Method: tx.paymentMethod || 'Cash',
-      "Debit (Out)": tx.type === 'Debit' ? tx.amount : 0,
       "Credit (In)": tx.type === 'Credit' ? tx.amount : 0,
+      "Debit (Out)": tx.type === 'Debit' ? tx.amount : 0,
       Balance: activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance
     }));
     
@@ -519,8 +519,8 @@ const Ledger = ({ theme }) => {
                 <th className="px-6 py-4 font-bold">Description</th>
                 <th className="px-6 py-4 font-bold">Category</th>
                 <th className="px-6 py-4 font-bold">Method</th>
-                <th className="px-6 py-4 font-bold text-right text-rose-500">Debit (Out)</th>
                 <th className="px-6 py-4 font-bold text-right text-emerald-500">Credit (In)</th>
+                <th className="px-6 py-4 font-bold text-right text-rose-500">Debit (Out)</th>
                 <th className="px-6 py-4 font-bold text-right">Balance</th>
                 <th className="px-6 py-4 font-bold text-center">Action</th>
               </tr>
@@ -555,11 +555,11 @@ const Ledger = ({ theme }) => {
                         {tx.paymentMethod || 'Cash'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
-                      {tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
-                    </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
                       {tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
+                      {tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-slate-800">
                       {activeView === 'partyDetail' 
