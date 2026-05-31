@@ -942,12 +942,18 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     
     // KPI Aggregation
     const stats = agreements.reduce((acc, curr) => {
-      acc.grossRevenue += parseFloat(curr.model.onRoadPrice) || 0;
-      acc.netProfit += parseFloat(curr.dse.finalNetProfit) || 0;
+      const profit = parseFloat(curr.dse.finalNetProfit) || 0;
+      acc.netProfit += profit;
+      if (curr.agreementType === 'TYPE2') {
+          acc.evNetProfit += profit;
+      } else {
+          acc.bajajNetProfit += profit;
+      }
       acc.tds += parseFloat(curr.dse.tds) || 0;
       acc.pendingDues += parseFloat(curr.payment.netDues) || 0;
+      acc.dseComm += parseFloat(curr.dse.dseCommission) || 0;
       return acc;
-    }, { grossRevenue: 0, netProfit: 0, tds: 0, pendingDues: 0 });
+    }, { netProfit: 0, evNetProfit: 0, bajajNetProfit: 0, tds: 0, pendingDues: 0, dseComm: 0 });
 
     // Monthly Trends (Last 12 months)
     const monthlyMap = {};
@@ -1098,8 +1104,9 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     res.json({
       kpis: [
         { id: 'net_profit', label: 'Net Profit', value: `₹ ${formatter.format(stats.netProfit)}`, raw: stats.netProfit },
-        { id: 'gross_rev', label: 'Gross Revenue', value: `₹ ${formatter.format(stats.grossRevenue)}`, raw: stats.grossRevenue },
-        { id: 'dse_comm', label: 'DSE Payouts', value: '₹ 0', raw: 0 }, 
+        { id: 'ev_net_profit', label: 'EV Net Profit', value: `₹ ${formatter.format(stats.evNetProfit)}`, raw: stats.evNetProfit },
+        { id: 'bajaj_net_profit', label: 'Bajaj Net Profit', value: `₹ ${formatter.format(stats.bajajNetProfit)}`, raw: stats.bajajNetProfit },
+        { id: 'dse_comm', label: 'DSE Payouts', value: `₹ ${formatter.format(stats.dseComm)}`, raw: stats.dseComm }, 
         { id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${formatter.format(stats.tds)}`, raw: stats.tds },
         { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${formatter.format(stats.pendingDues)}`, raw: stats.pendingDues }
       ],

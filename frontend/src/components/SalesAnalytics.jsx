@@ -74,7 +74,8 @@ const SalesAnalytics = ({ theme: t }) => {
     const kpiData = analyticsData?.kpis.map(kpi => {
         const mockMatch = [
             { id: 'net_profit', icon: Wallet, sub: 'Post-Tax Earnings', variant: 'primary', progress: 85 },
-            { id: 'gross_rev', icon: DollarSign, sub: 'Total Invoiced Value', variant: 'dark', progress: 92 },
+            { id: 'ev_net_profit', icon: Zap, sub: 'EV Operations', variant: 'dark', progress: 90 },
+            { id: 'bajaj_net_profit', icon: Briefcase, sub: 'Bajaj Operations', variant: 'dark', progress: 85 },
             { id: 'dse_comm', icon: Users, sub: 'Dealer Commissions', variant: 'white', progress: 45 },
             { id: 'tds_deduct', icon: Percent, sub: 'Govt. Tax Deducted', variant: 'white', progress: 20 },
             { id: 'dues_pending', icon: AlertCircle, sub: 'Accounts Receivable', variant: 'white', progress: 65 }
@@ -84,7 +85,7 @@ const SalesAnalytics = ({ theme: t }) => {
             ...kpi,
             ...mockMatch,
             trend: '+0%', // Trends are not yet calculated in backend
-            isPositive: kpi.id === 'net_profit' || kpi.id === 'gross_rev'
+            isPositive: kpi.id === 'net_profit' || kpi.id === 'ev_net_profit' || kpi.id === 'bajaj_net_profit'
         };
     }) || [];
 
@@ -229,7 +230,7 @@ const SalesAnalytics = ({ theme: t }) => {
             </div>
 
             {/* --- 2. HERO KPI CARDS --- */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {kpiData.map((kpi) => {
                     const isPrimary = kpi.variant === 'primary';
                     const isDark = kpi.variant === 'dark';
