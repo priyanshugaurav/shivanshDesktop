@@ -141,7 +141,9 @@ const AgreementSchema = new mongoose.Schema({
     registration: String,
     onlinePayment: String,
     permit: String,
-    total: String
+    total: String,
+    upper: String,
+    lower: String
   },
   broker: {
     name: String,

@@ -445,7 +445,14 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
                                 <Field label="DTO Registration" value={data.dto?.registration} />
                              </div>
                              <div className="grid grid-cols-2 gap-4">
+                                <Field label="DTO Permit" value={data.dto?.permit} />
                                 <Field label="DTO Online Payment" value={data.dto?.onlinePayment} />
+                             </div>
+                             <div className="grid grid-cols-2 gap-4">
+                                <Field label="DTO Upper" value={data.dto?.upper} />
+                                <Field label="DTO Lower" value={data.dto?.lower} />
+                             </div>
+                             <div className="grid grid-cols-2 gap-4">
                                 <Field label="DTO Total" value={data.dto?.total} />
                              </div>
                         </div>
@@ -534,7 +541,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       agreementId: '',
       model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', registration: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00', sellingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
-      dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
+      dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', upper: '', lower: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
       payment: { downPaymentAuto: '0.00', downPayment: '', discount: '0', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
       other: { amount: '', remark: '' },
@@ -656,8 +663,9 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
         }
         
-        // 2. DTO Total (New: DTO Total = RTO)
-        const dtoTotal = formData.agreementType === 'TYPE2' ? '0.00' : rto.toFixed(2); 
+        // 2. DTO Total (All sections in DTO added)
+        const dtoTotalVal = safe(formData.dto.registration) + safe(formData.dto.onlinePayment) + safe(formData.dto.permit) + safe(formData.dto.upper) + safe(formData.dto.lower);
+        const dtoTotal = formData.agreementType === 'TYPE2' ? '0.00' : dtoTotalVal.toFixed(2); 
         
         // 4. Down Payment (Manual logic from user: On Road - Loan)
         const downPaymentAutoVal = (safe(onRoadPrice) - loanAmt + (formData.agreementType === 'TYPE2' ? bankFee : 0));
@@ -703,7 +711,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         }
     }, [
         formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit, formData.model.registration, formData.model.discount,
-        formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit,
+        formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit, formData.dto.upper, formData.dto.lower,
         formData.loan.processingFee, formData.loan.amount,
         formData.payment.paidAmount, formData.payment.discount,
         formData.broker.amount, formData.other.amount,
@@ -859,14 +867,20 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <Input label="DTO Permit" value={formData.dto.permit} onChange={v => handleDeepChange('dto', 'permit', v)} theme={theme} />
+                                <Input label="DTO Online Payment" value={formData.dto.onlinePayment} onChange={v => handleDeepChange('dto', 'onlinePayment', v)} theme={theme} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input label="DTO Upper" value={formData.dto.upper} onChange={v => handleDeepChange('dto', 'upper', v)} theme={theme} />
+                                <Input label="DTO Lower" value={formData.dto.lower} onChange={v => handleDeepChange('dto', 'lower', v)} theme={theme} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Total (Matches RTO)</label>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Total</label>
                                     <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">
                                         {formData.dto.total}
                                     </div>
                                 </div>
                             </div>
-                            <Input label="DTO Online Payment" value={formData.dto.onlinePayment} onChange={v => handleDeepChange('dto', 'onlinePayment', v)} theme={theme} />
                         </div>
                       </div>
                   </div>
