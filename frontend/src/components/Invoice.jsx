@@ -496,7 +496,7 @@ const Invoice = ({ theme }) => {
                         {/* TOP SECTION: COMPANY & INVOICE INFO */}
                         <div className="flex border-x-2 border-b-2 border-black" style={{ borderColor: '#000000' }}>
                             <div className="w-[400px] p-2 border-r-2 border-black" style={{ borderColor: '#000000' }}>
-                                <h1 className="font-black text-xl leading-tight uppercase">SHIVANSH AUTO ENTERPRISES</h1>
+                                <h1 className="font-black text-xl leading-tight uppercase">RAJIV TRADERS</h1>
                                 <p className="text-[11px] leading-tight font-bold mt-1">NEW BELDARICHAK,</p>
                                 <p className="text-[11px] leading-tight font-bold">PUNPUN-PARSA MAIN ROAD,</p>
                                 <p className="text-[11px] leading-tight font-bold">MAUJA RAMPUR, CHIHUT,</p>
@@ -510,7 +510,7 @@ const Invoice = ({ theme }) => {
                                     <div className="col-span-3">Cont No.</div>
                                     <div className="col-span-9">9304258184</div>
                                     <div className="col-span-3">E-Mail:</div>
-                                    <div className="col-span-9 underline" style={{ color: '#2563eb' }}>shivanshautoenterprises@gmail.com</div>
+                                    <div className="col-span-9 underline" style={{ color: '#2563eb' }}>rajivtraders@gmail.com</div>
                                 </div>
                             </div>
                             

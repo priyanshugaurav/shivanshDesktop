@@ -203,7 +203,7 @@ const Ledger = ({ theme }) => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(22);
     doc.setTextColor(15, 23, 42);
-    doc.text("SHIVANSH AUTO ENTERPRISES", 14, 22);
+    doc.text("RAJIV TRADERS", 14, 22);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
@@ -311,11 +311,11 @@ const Ledger = ({ theme }) => {
       doc.setDrawColor(226, 232, 240);
       doc.line(14, doc.internal.pageSize.height - 15, doc.internal.pageSize.width - 14, doc.internal.pageSize.height - 15);
       
-      doc.text("Shivansh Auto Enterprises - Official Record", 14, doc.internal.pageSize.height - 8);
+      doc.text("Rajiv Traders - Official Record", 14, doc.internal.pageSize.height - 8);
       doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 8);
     }
 
-    doc.save(`Shivansh_Ledger_${new Date().getTime()}.pdf`);
+    doc.save(`Rajiv_Traders_Ledger_${new Date().getTime()}.pdf`);
   };
 
   const handleExportExcel = () => {
@@ -541,7 +541,14 @@ const Ledger = ({ theme }) => {
                 </tr>
               ) : (
                 dataToRender.map((tx) => (
-                  <tr key={tx._id} className="hover:bg-slate-50 transition-colors group">
+                  <tr key={tx._id} className="hover:bg-slate-50 transition-colors group cursor-pointer" onClick={(e) => {
+                    if (e.target.closest('button')) return;
+                    setFormData({
+                      ...formData,
+                      partyName: tx.partyName || ''
+                    });
+                    setShowModal(true);
+                  }}>
                     <td className="px-6 py-4 text-slate-600 font-medium">{new Date(tx.date).toLocaleDateString()}</td>
                     <td className="px-6 py-4 text-slate-800 font-semibold">{tx.partyName || '-'}</td>
                     <td className="px-6 py-4 text-slate-700 font-medium">{tx.description}</td>
@@ -568,7 +575,7 @@ const Ledger = ({ theme }) => {
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button 
-                        onClick={() => handleDelete(tx._id)} 
+                        onClick={(e) => { e.stopPropagation(); handleDelete(tx._id); }} 
                         className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded transition-all opacity-0 group-hover:opacity-100"
                         title="Delete entry"
                       >
@@ -627,6 +634,9 @@ const Ledger = ({ theme }) => {
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-200" 
                 />
                 <datalist id="customers-list">
+                  {partiesData.map(p => (
+                    p.name !== 'Unspecified / Manual' && <option key={`party-${p.name}`} value={p.name} />
+                  ))}
                   {customers.map(c => {
                     const fullName = `${c.personal?.firstName || ''} ${c.personal?.lastName || ''}`.trim();
                     return <option key={c._id} value={fullName} />;
