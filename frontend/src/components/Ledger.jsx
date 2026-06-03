@@ -125,6 +125,17 @@ const Ledger = ({ theme }) => {
   const totalCredits = transactions.filter(t => t.type === 'Credit').reduce((acc, curr) => acc + curr.amount, 0);
   const totalDebits = transactions.filter(t => t.type === 'Debit').reduce((acc, curr) => acc + curr.amount, 0);
 
+  const transactionsWithBalance = useMemo(() => {
+    const sortedAsc = [...transactions].reverse();
+    let runningBalance = 0;
+    const computed = sortedAsc.map(tx => {
+      if (tx.type === 'Credit') runningBalance += tx.amount;
+      if (tx.type === 'Debit') runningBalance -= tx.amount;
+      return { ...tx, computedBalance: runningBalance };
+    });
+    return computed.reverse();
+  }, [transactions]);
+
   const partiesData = useMemo(() => {
     const parties = {};
     transactions.forEach(tx => {
@@ -167,7 +178,7 @@ const Ledger = ({ theme }) => {
     return txDate >= start && txDate <= end;
   };
 
-  const filteredTransactions = transactions.filter(t => 
+  const filteredTransactions = transactionsWithBalance.filter(t => 
     dateFilter(t) &&
     (t.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
      t.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -189,7 +200,7 @@ const Ledger = ({ theme }) => {
   const displayCredits = dataToRender.filter(t => t.type === 'Credit').reduce((acc, curr) => acc + curr.amount, 0);
   const displayDebits = dataToRender.filter(t => t.type === 'Debit').reduce((acc, curr) => acc + curr.amount, 0);
   const displayBalance = dataToRender.length > 0 
-    ? (activeView === 'partyDetail' ? dataToRender[0].partyRunningBalance : dataToRender[0].balance)
+    ? (activeView === 'partyDetail' ? dataToRender[0].partyRunningBalance : dataToRender[0].computedBalance)
     : 0;
 
   const handleExportPDF = () => {
@@ -280,7 +291,7 @@ const Ledger = ({ theme }) => {
         tx.paymentMethod || 'Cash',
         tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
         tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
-        (activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+        (activeView === 'partyDetail' ? tx.partyRunningBalance : tx.computedBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })
       ];
       tableRows.push(txData);
     });
@@ -327,7 +338,7 @@ const Ledger = ({ theme }) => {
       Method: tx.paymentMethod || 'Cash',
       "Credit (In)": tx.type === 'Credit' ? tx.amount : 0,
       "Debit (Out)": tx.type === 'Debit' ? tx.amount : 0,
-      Balance: activeView === 'partyDetail' ? tx.partyRunningBalance : tx.balance
+      Balance: activeView === 'partyDetail' ? tx.partyRunningBalance : tx.computedBalance
     }));
     
     const ws = XLSX.utils.json_to_sheet(wsData);
@@ -571,7 +582,7 @@ const Ledger = ({ theme }) => {
                     <td className="px-6 py-4 text-right font-mono font-bold text-slate-800">
                       {activeView === 'partyDetail' 
                         ? tx.partyRunningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-                        : tx.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        : tx.computedBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <button 
