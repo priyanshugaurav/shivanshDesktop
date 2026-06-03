@@ -219,7 +219,7 @@ const Ledger = ({ theme }) => {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.width - 14, 28, { align: "right" });
+    doc.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`, doc.internal.pageSize.width - 14, 28, { align: "right" });
 
     // Divider Line
     doc.setDrawColor(226, 232, 240); // slate-200
@@ -275,7 +275,7 @@ const Ledger = ({ theme }) => {
 
     chronologicalData.forEach(tx => {
       const txData = [
-        new Date(tx.date).toLocaleDateString(),
+        new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
         tx.description,
         tx.paymentMethod || 'Cash',
         tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '',
@@ -320,7 +320,7 @@ const Ledger = ({ theme }) => {
 
   const handleExportExcel = () => {
     const wsData = dataToRender.map(tx => ({
-      Date: new Date(tx.date).toLocaleDateString(),
+      Date: new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
       "Party / Account": tx.partyName || '-',
       Description: tx.description,
       Category: tx.category,
@@ -549,7 +549,7 @@ const Ledger = ({ theme }) => {
                     });
                     setShowModal(true);
                   }}>
-                    <td className="px-6 py-4 text-slate-600 font-medium">{new Date(tx.date).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-slate-600 font-medium">{new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                     <td className="px-6 py-4 text-slate-800 font-semibold">{tx.partyName || '-'}</td>
                     <td className="px-6 py-4 text-slate-700 font-medium">{tx.description}</td>
                     <td className="px-6 py-4">

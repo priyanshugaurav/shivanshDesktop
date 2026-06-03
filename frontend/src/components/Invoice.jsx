@@ -261,7 +261,7 @@ const Invoice = ({ theme }) => {
     const totalInvoiceValue = enteredTotal;
 
     // Format Date for preview
-    const previewDate = formData.date ? new Date(formData.date).toLocaleDateString('en-GB') : '';
+    const previewDate = formData.date ? new Date(formData.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 
     return (
         <div className="flex flex-col lg:flex-row h-[calc(100vh-120px)] gap-6 animate-in fade-in duration-500">
