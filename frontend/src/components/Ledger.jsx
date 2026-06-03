@@ -656,6 +656,7 @@ const Ledger = ({ theme }) => {
                   <option value="Bank Transfer">Bank Transfer</option>
                   <option value="Card">Card</option>
                   <option value="Cheque">Cheque</option>
+                  <option value="VEHICLE IN">VEHICLE IN</option>
                 </select>
               </div>
 
