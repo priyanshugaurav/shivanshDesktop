@@ -185,7 +185,8 @@ const CollectionSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   amount: { type: Number, required: true },
   method: { type: String, enum: ['Cash', 'UPI', 'Cheque'], default: 'Cash' },
-  date: { type: Date, default: Date.now }
+  date: { type: Date, default: Date.now },
+  ledgerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ledger' }
 });
 const Collection = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema);
 
@@ -1132,6 +1133,25 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
 
 // --- Dues & Collections Routes ---
 
+app.get('/api/dues/fix-balances', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find({});
+    for (let agg of agreements) {
+      const collections = await Collection.find({ agreementId: agg._id });
+      const totalCollected = collections.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      const initialDues = parseFloat(agg.payment.dues) || 0;
+      const newNetDues = Math.max(0, initialDues - totalCollected);
+      
+      await Agreement.findByIdAndUpdate(agg._id, {
+        $set: { 'payment.netDues': newNetDues.toString() }
+      });
+    }
+    res.json({ message: 'All balances recalculated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/dues', verifyToken, async (req, res) => {
   try {
     // Find agreements where netDues > 0
@@ -1162,27 +1182,80 @@ app.post('/api/dues/collect', verifyToken, async (req, res) => {
     const agreement = await Agreement.findById(agreementId);
     if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
 
-    // 1. Create Collection Entry
+    // 1. Calculate Ledger Running Balance
+    const lastEntry = await Ledger.findOne().sort({ date: -1, createdAt: -1 });
+    const previousBalance = lastEntry ? lastEntry.balance : 0;
+    const newBalance = previousBalance + Number(amount);
+
+    // 2. Create Ledger Entry
+    const ledgerEntry = await Ledger.create({
+      date: date ? new Date(date) : Date.now(),
+      description: `Collection from Agreement ${agreement.agreementId || agreement._id}`,
+      category: 'Collection',
+      type: 'Credit',
+      amount: Number(amount),
+      balance: newBalance,
+      partyName: `${agreement.customerId?.personal?.firstName || 'Customer'} ${agreement.customerId?.personal?.lastName || ''}`.trim(),
+      paymentMethod: method || 'Cash'
+    });
+
+    // 3. Create Collection Entry
     await Collection.create({
       agreementId: agreement._id,
       customerId: agreement.customerId,
       amount: Number(amount),
       method: method || 'Cash',
-      date: date ? new Date(date) : new Date()
+      date: date ? new Date(date) : Date.now(),
+      ledgerId: ledgerEntry._id
     });
 
-    // 2. Update Agreement Balance
-    const newPaid = (parseFloat(agreement.payment.paidAmount) || 0) + Number(amount);
+    // 4. Update Agreement Balance (only netDues)
     const newDues = (parseFloat(agreement.payment.netDues) || 0) - Number(amount);
 
     await Agreement.findByIdAndUpdate(agreementId, {
       $set: {
-        'payment.paidAmount': newPaid.toString(),
         'payment.netDues': newDues.toString()
       }
     });
 
     res.json({ message: 'Payment recorded successfully', newDues });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/dues/history/:id', verifyToken, async (req, res) => {
+  try {
+    const collectionId = req.params.id;
+    const collection = await Collection.findById(collectionId);
+    
+    if (!collection) {
+      return res.status(404).json({ message: 'Collection not found' });
+    }
+
+    const agreement = await Agreement.findById(collection.agreementId);
+    if (!agreement) {
+      return res.status(404).json({ message: 'Associated agreement not found' });
+    }
+
+    // Revert Agreement Balance (only netDues)
+    const newDues = (parseFloat(agreement.payment.netDues) || 0) + collection.amount;
+
+    await Agreement.findByIdAndUpdate(agreement._id, {
+      $set: {
+        'payment.netDues': newDues.toString()
+      }
+    });
+
+    // Delete associated Ledger Entry if exists
+    if (collection.ledgerId) {
+      await Ledger.findByIdAndDelete(collection.ledgerId);
+    }
+
+    // Delete Collection
+    await Collection.findByIdAndDelete(collectionId);
+
+    res.json({ message: 'Payment deleted and balance reverted successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

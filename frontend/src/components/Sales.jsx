@@ -517,7 +517,7 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
 };
 
 // --- REUSABLE COMPONENTS (Defined outside to prevent re-mount focus issues) ---
-const Input = ({ label, value, onChange, type="text", prefix, theme }) => (
+const Input = ({ label, value, onChange, type="text", prefix, theme, readOnly=false }) => (
     <div>
         <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">{label}</label>
         <div className="relative">
@@ -525,8 +525,9 @@ const Input = ({ label, value, onChange, type="text", prefix, theme }) => (
             <input 
                 type={type} 
                 value={value ?? ''} 
-                onChange={e => onChange(e.target.value)} 
-                className={`w-full ${prefix ? 'pl-7' : 'px-3'} py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-transparent focus:ring-1 ${theme?.ring} outline-none transition-all`} 
+                onChange={e => !readOnly && onChange(e.target.value)} 
+                readOnly={readOnly}
+                className={`w-full ${prefix ? 'pl-7' : 'px-3'} py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-transparent focus:ring-1 ${theme?.ring} outline-none transition-all ${readOnly ? 'cursor-not-allowed opacity-70' : ''}`} 
             />
         </div>
     </div>
@@ -688,13 +689,17 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const tds = (dealCommission * 0.05).toFixed(2);
         const finalNetProfit = (safe(netProfit) - safe(tds)).toFixed(2);
         
+        // Calculate Collections Made (Initial Dues - Initial Net Dues)
+        const collectionsMade = initialData ? (safe(initialData.payment.dues) - safe(initialData.payment.netDues)) : 0;
+        const newNetDues = Math.max(0, safe(dues) - collectionsMade).toFixed(2);
+
         // Update State
         const needsUpdate = (
             formData.model.onRoadPrice !== onRoadPrice ||
             formData.magadhMargin !== magadhMargin ||
             formData.dto.total !== dtoTotal ||
             formData.payment.dues !== dues ||
-            formData.payment.netDues !== dues ||
+            formData.payment.netDues !== newNetDues ||
             formData.dse.netProfit !== netProfit ||
             formData.dse.tds !== tds ||
             formData.dse.finalNetProfit !== finalNetProfit
@@ -709,7 +714,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                 payment: { 
                     ...prev.payment, 
                     dues, 
-                    netDues: (prev.payment.netDues === prev.payment.dues || !initialData) ? dues : prev.payment.netDues 
+                    netDues: newNetDues 
                 },
                 dse: { ...prev.dse, netProfit, tds, finalNetProfit }
             }));
@@ -934,7 +939,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                               <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Dues (Auto)</label>
                               <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.dues}</div>
                           </div>
-                          <Input label="Net Dues Remaining" value={formData.payment.netDues} onChange={v => handleDeepChange('payment', 'netDues', v)} theme={theme} />
+                          <Input label="Net Dues Remaining" value={formData.payment.netDues} readOnly={true} theme={theme} />
                       </div>
                   </div>
 
