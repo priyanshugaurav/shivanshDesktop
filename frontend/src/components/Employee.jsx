@@ -21,56 +21,98 @@ const PayrollCalendar = ({ month, year, selectedDates, onSelectDate, theme }) =>
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
     const blanks = Array.from({ length: firstDay }, (_, i) => i);
 
+    const [isDragging, setIsDragging] = React.useState(false);
+    const [dragMode, setDragMode] = React.useState(null);
+
+    const handleMouseDown = (day) => {
+        setIsDragging(true);
+        const dayStr = day.toString();
+        const mode = selectedDates.includes(dayStr) ? 'deselect' : 'select';
+        setDragMode(mode);
+        onSelectDate(prev => {
+            if (mode === 'select' && !prev.includes(dayStr)) return [...prev, dayStr];
+            if (mode === 'deselect' && prev.includes(dayStr)) return prev.filter(d => d !== dayStr);
+            return prev;
+        });
+    };
+
+    const handleMouseEnter = (day) => {
+        if (isDragging && dragMode) {
+            onSelectDate(prev => {
+                const dayStr = day.toString();
+                if (dragMode === 'select' && !prev.includes(dayStr)) return [...prev, dayStr];
+                if (dragMode === 'deselect' && prev.includes(dayStr)) return prev.filter(d => d !== dayStr);
+                return prev;
+            });
+        }
+    };
+
+    React.useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            setIsDragging(false);
+            setDragMode(null);
+        };
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, []);
+
+    const selectRange = (start, end) => {
+        const range = [];
+        for (let i = start; i <= end; i++) range.push(i.toString());
+        onSelectDate(range);
+    };
+
+    const shadowColor = theme.primary.split('-')[1]; // e.g. 'emerald'
+
     return (
-        <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 shadow-inner mt-6 w-full">
-            <div className="flex justify-between items-center mb-6">
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-200/60 shadow-sm mt-6 w-full relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-slate-100">
+                <div className={`h-full ${theme.primary} transition-all duration-500`} style={{ width: `${(selectedDates.length / daysInMonth) * 100}%` }}></div>
+            </div>
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pt-2">
                 <div>
-                    <h3 className="text-sm font-black text-slate-900">Select Payable Days</h3>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedDates.length} days selected</p>
+                    <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        Select Payable Days
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[9px] font-bold text-slate-500 uppercase tracking-widest border border-slate-200">Drag to Select</span>
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-xs font-black ${selectedDates.length > 0 ? theme.text : 'text-slate-400'}`}>
+                            {selectedDates.length} <span className="font-medium">/ {daysInMonth} Days Selected</span>
+                        </span>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => onSelectDate(days.map(d => d.toString()))} 
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100`}
-                    >
-                        Select All
-                    </button>
-                    <button 
-                        onClick={() => onSelectDate([])} 
-                        className="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-rose-50 text-rose-600 hover:bg-rose-100"
-                    >
-                        Clear
-                    </button>
+                <div className="flex flex-wrap gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                    <button onClick={() => selectRange(1, 15)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all bg-white text-slate-600 hover:text-slate-900 hover:shadow-sm border border-slate-200/60">1st Half</button>
+                    <button onClick={() => selectRange(16, daysInMonth)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all bg-white text-slate-600 hover:text-slate-900 hover:shadow-sm border border-slate-200/60">2nd Half</button>
+                    <button onClick={() => selectRange(1, daysInMonth)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${theme.light} ${theme.text} hover:scale-105`}>All</button>
+                    <button onClick={() => onSelectDate([])} className="px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all bg-rose-50 text-rose-600 hover:bg-rose-100 hover:scale-105">Clear</button>
                 </div>
             </div>
-            <div className="grid grid-cols-7 gap-2 sm:gap-3 mb-2">
-                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-                    <div key={day} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</div>
+            
+            <div className="grid grid-cols-7 gap-2 sm:gap-3 mb-3">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">{day}</div>
                 ))}
             </div>
-            <div className="grid grid-cols-7 gap-2 sm:gap-3">
+            <div className="grid grid-cols-7 gap-2 sm:gap-3" onMouseLeave={() => { setIsDragging(false); setDragMode(null); }}>
                 {blanks.map(b => <div key={`blank-${b}`} className="aspect-square"></div>)}
                 {days.map(day => {
                     const isSelected = selectedDates.includes(day.toString());
                     return (
-                        <button
+                        <div
                             key={day}
-                            onClick={() => {
-                                const dayStr = day.toString();
-                                if (isSelected) {
-                                    onSelectDate(selectedDates.filter(d => d !== dayStr));
-                                } else {
-                                    onSelectDate([...selectedDates, dayStr]);
-                                }
-                            }}
-                            className={`aspect-square rounded-2xl flex items-center justify-center text-xs sm:text-sm font-black transition-all ${
+                            onMouseDown={(e) => { e.preventDefault(); handleMouseDown(day); }}
+                            onMouseEnter={() => handleMouseEnter(day)}
+                            className={`aspect-square rounded-[1.2rem] flex flex-col items-center justify-center text-sm font-black transition-all cursor-pointer select-none border ${
                                 isSelected 
-                                ? `${theme.primary} text-white shadow-lg scale-105 shadow-${theme.primary.split('-')[1]}-200/50` 
-                                : 'bg-white text-slate-600 hover:bg-slate-100 hover:scale-105 border border-slate-200/60 shadow-sm'
+                                ? `${theme.primary} text-white shadow-lg scale-105 border-transparent shadow-${shadowColor}-500/30` 
+                                : 'bg-slate-50 text-slate-600 hover:bg-white hover:shadow-md border-slate-100 hover:border-slate-300'
                             }`}
                         >
                             {day}
-                        </button>
+                            {isSelected && <span className="w-1 h-1 bg-white rounded-full mt-0.5 opacity-80"></span>}
+                        </div>
                     )
                 })}
             </div>
