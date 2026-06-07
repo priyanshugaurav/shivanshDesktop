@@ -16,6 +16,7 @@ const Dues = ({ theme: t }) => {
     const [duesData, setDuesData] = useState([]);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const getThemeGradient = () => {
         if (t.primary.includes('emerald')) return 'from-emerald-500 to-emerald-700';
         if (t.primary.includes('blue')) return 'from-blue-500 to-blue-700';
@@ -68,8 +69,9 @@ const Dues = ({ theme: t }) => {
     };
 
     const handleProcessPayment = async () => {
-        if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0) return;
+        if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0 || isSubmitting) return;
 
+        setIsSubmitting(true);
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('/api/dues/collect', {
@@ -93,6 +95,8 @@ const Dues = ({ theme: t }) => {
             }
         } catch (error) {
             console.error("Payment failed:", error);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -386,9 +390,19 @@ const Dues = ({ theme: t }) => {
 
                             <button 
                                 onClick={handleProcessPayment}
-                                className={`w-full py-3.5 rounded-xl text-xs font-bold text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest ${t.primary}`}
+                                disabled={isSubmitting}
+                                className={`w-full py-3.5 rounded-xl text-xs font-bold text-white shadow-lg transition-all uppercase tracking-widest flex items-center justify-center gap-2 ${
+                                    isSubmitting ? 'bg-slate-400 cursor-not-allowed shadow-none' : `hover:shadow-xl hover:-translate-y-0.5 ${t.primary}`
+                                }`}
                             >
-                                Confirm Payment
+                                {isSubmitting ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    'Confirm Payment'
+                                )}
                             </button>
                         </div>
                     </div>
