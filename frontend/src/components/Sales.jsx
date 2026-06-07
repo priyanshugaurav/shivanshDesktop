@@ -428,6 +428,13 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
                   </Section>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {data.agreementType !== 'TYPE2' && (
+                        <Section title="Magadh Margin" icon={MapPin}>
+                            <div className="grid grid-cols-1 gap-4">
+                                <Field label="Magadh Margin" value={data.magadhMargin} />
+                            </div>
+                        </Section>
+                    )}
                     <Section title="Loan Details" icon={Landmark}>
                         <div className="grid grid-cols-1 gap-4">
                             <Field label="Bank Name" value={data.loan?.bankName} />
@@ -447,10 +454,6 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
                              <div className="grid grid-cols-2 gap-4">
                                 <Field label="DTO Permit" value={data.dto?.permit} />
                                 <Field label="DTO Online Payment" value={data.dto?.onlinePayment} />
-                             </div>
-                             <div className="grid grid-cols-2 gap-4">
-                                <Field label="DTO Upper" value={data.dto?.upper} />
-                                <Field label="DTO Lower" value={data.dto?.lower} />
                              </div>
                              <div className="grid grid-cols-2 gap-4">
                                 <Field label="DTO Total" value={data.dto?.total} />
@@ -480,7 +483,6 @@ const ViewAgreement = ({ theme, customer, onBack, onEdit }) => {
 
                   <Section title="Payment Details" icon={Calculator}>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <Field label="Customer Down Payment (Auto)" value={data.payment?.downPaymentAuto || (data.payment?.downPayment && data.payment?.discount ? (parseFloat(data.payment.downPayment) + parseFloat(data.payment.discount)).toFixed(2) : data.payment?.downPayment)} />
                             <Field label="Discount" value={data.payment?.discount || '0'} />
                             <Field label="Customer Down Payment" value={data.payment?.downPayment} />
                             <Field label="Customer Paid Amount" value={data.payment?.paidAmount} />
@@ -541,9 +543,10 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       agreementId: '',
       model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', registration: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00', sellingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
-      dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', upper: '', lower: '', total: '0.00' },
+      magadhMargin: '0.00',
+      dto: { place: 'PATNA', registration: '', onlinePayment: '', permit: '', total: '0.00' },
       broker: { name: '', phone: '', village: '', amount: '' },
-      payment: { downPaymentAuto: '0.00', downPayment: '', discount: '0', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
+      payment: { downPayment: '', discount: '0', paidAmount: '', type: 'CASH', date: '', dues: '0.00', netDues: '0.00' },
       other: { amount: '', remark: '' },
       dse: { name: '', commission: '', dseCommission: '', netProfit: '0.00', tds: '0.00', finalNetProfit: '0.00' }
     });
@@ -634,7 +637,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
       }));
     };
 
-    // MASTER CALCULATION HOOK (8 CALCS)
+    // MASTER CALCULATION HOOK
     useEffect(() => {
         const safe = (val) => parseFloat(val) || 0;
         
@@ -649,10 +652,28 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const brokerAmt = safe(formData.broker.amount);
         const otherAmt = safe(formData.other.amount);
         const landingPrice = safe(formData.model.landingPrice);
-        const paymentDiscount = safe(formData.payment.discount);
 
-        let onRoadPrice, netProfit;
+        let onRoadPrice, netProfit, magadhMargin;
 
+        // 1. Magadh Margin (Auto)
+        const magadhMarginVal = exShowroom + insurance + bankFee - loanAmt;
+        magadhMargin = magadhMarginVal.toFixed(2);
+
+        // 2. DTO Total
+        const dtoTotalVal = safe(formData.dto.registration) + safe(formData.dto.onlinePayment) + safe(formData.dto.permit);
+        const dtoTotal = formData.agreementType === 'TYPE2' ? '0.00' : dtoTotalVal.toFixed(2); 
+        
+        // 3. Customer Down Payment & Paid Amount
+        const downPayment = safe(formData.payment.downPayment);
+        const paidAmt = safe(formData.payment.paidAmount);
+        
+        // 4. Dues (Down payment - Paid amount)
+        const dues = (downPayment - paidAmt).toFixed(2);
+        
+        // 5. Deal Commission
+        const dealCommission = safe(formData.dse.commission);
+
+        // 6. On Road & Net Profit
         if (formData.agreementType === 'TYPE2') {
             const costPrice = insurance + registration + exShowroom;
             const sellingPrice = safe(formData.model.sellingPrice);
@@ -660,35 +681,20 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             netProfit = (sellingPrice - costPrice - brokerAmt - otherAmt).toFixed(2);
         } else {
             onRoadPrice = (exShowroom + insurance + rto + permit - discount).toFixed(2);
-            netProfit = (safe(onRoadPrice) - (rto + permit + insurance + bankFee + brokerAmt + otherAmt) - landingPrice).toFixed(2);
+            netProfit = (downPayment - safe(magadhMargin) - safe(dtoTotal) + dealCommission).toFixed(2);
         }
         
-        // 2. DTO Total (All sections in DTO added)
-        const dtoTotalVal = safe(formData.dto.registration) + safe(formData.dto.onlinePayment) + safe(formData.dto.permit) + safe(formData.dto.upper) + safe(formData.dto.lower);
-        const dtoTotal = formData.agreementType === 'TYPE2' ? '0.00' : dtoTotalVal.toFixed(2); 
-        
-        // 4. Down Payment (Manual logic from user: On Road - Loan)
-        const downPaymentAutoVal = (safe(onRoadPrice) - loanAmt + (formData.agreementType === 'TYPE2' ? bankFee : 0));
-        const downPaymentAuto = downPaymentAutoVal.toFixed(2);
-        const downPayment = (downPaymentAutoVal - paymentDiscount).toFixed(2);
-        
-        // 5. Dues (Down payment - Paid amount)
-        const paidAmt = safe(formData.payment.paidAmount);
-        const dues = (safe(downPayment) - paidAmt).toFixed(2);
-        
-        // 8. TDS and Final Net Profit (Dependent on Deal Commission)
-        const dealCommission = safe(formData.dse.commission);
+        // 7. TDS and Final Net Profit
         const tds = (dealCommission * 0.05).toFixed(2);
         const finalNetProfit = (safe(netProfit) - safe(tds)).toFixed(2);
         
-        // Update State (Avoiding infinite loops by comparing values)
+        // Update State
         const needsUpdate = (
             formData.model.onRoadPrice !== onRoadPrice ||
+            formData.magadhMargin !== magadhMargin ||
             formData.dto.total !== dtoTotal ||
-            formData.payment.downPaymentAuto !== downPaymentAuto ||
-            formData.payment.downPayment !== downPayment ||
             formData.payment.dues !== dues ||
-            formData.payment.netDues !== dues || // Syncing net dues initially too
+            formData.payment.netDues !== dues ||
             formData.dse.netProfit !== netProfit ||
             formData.dse.tds !== tds ||
             formData.dse.finalNetProfit !== finalNetProfit
@@ -698,11 +704,10 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             setFormData(prev => ({
                 ...prev,
                 model: { ...prev.model, onRoadPrice },
+                magadhMargin,
                 dto: { ...prev.dto, total: dtoTotal },
                 payment: { 
                     ...prev.payment, 
-                    downPaymentAuto,
-                    downPayment, 
                     dues, 
                     netDues: (prev.payment.netDues === prev.payment.dues || !initialData) ? dues : prev.payment.netDues 
                 },
@@ -711,12 +716,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         }
     }, [
         formData.model.exShowroom, formData.model.insurance, formData.model.rto, formData.model.permit, formData.model.registration, formData.model.discount,
-        formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit, formData.dto.upper, formData.dto.lower,
+        formData.dto.registration, formData.dto.onlinePayment, formData.dto.permit,
         formData.loan.processingFee, formData.loan.amount,
-        formData.payment.paidAmount, formData.payment.discount,
-        formData.broker.amount, formData.other.amount,
-        formData.dse.commission, formData.dse.dseCommission,
-        formData.model.landingPrice, formData.agreementType, formData.model.sellingPrice
+        formData.payment.downPayment, formData.payment.paidAmount,
+        formData.dse.commission, formData.agreementType, formData.model.sellingPrice,
+        formData.broker.amount, formData.other.amount, formData.model.landingPrice
     ]);
 
     // Handle Model Selection Sync
@@ -870,10 +874,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                                 <Input label="DTO Online Payment" value={formData.dto.onlinePayment} onChange={v => handleDeepChange('dto', 'onlinePayment', v)} theme={theme} />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <Input label="DTO Upper" value={formData.dto.upper} onChange={v => handleDeepChange('dto', 'upper', v)} theme={theme} />
-                                <Input label="DTO Lower" value={formData.dto.lower} onChange={v => handleDeepChange('dto', 'lower', v)} theme={theme} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DTO Total</label>
                                     <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">
@@ -884,6 +884,22 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                         </div>
                       </div>
                   </div>
+
+                  {formData.agreementType !== 'TYPE2' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          <div>
+                            <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><MapPin className="h-4 w-4 text-slate-400" /> Magadh Margin</h3>
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Magadh Margin (Auto)</label>
+                                    <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">
+                                        {formData.magadhMargin}
+                                    </div>
+                                </div>
+                            </div>
+                          </div>
+                      </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
@@ -909,15 +925,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                   <div>
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Calculator className="h-4 w-4 text-slate-400" /> Payment</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
-                          <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Customer Down Payment (Auto)</label>
-                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.downPaymentAuto || '0.00'}</div>
-                          </div>
                           <Input label="Discount" value={formData.payment.discount} onChange={v => handleDeepChange('payment', 'discount', v)} theme={theme} />
-                          <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Customer Down Payment</label>
-                              <div className="px-3 py-2 bg-slate-100 border border-gray-200 rounded-lg text-xs font-black text-slate-900 h-9 flex items-center">{formData.payment.downPayment}</div>
-                          </div>
+                          <Input label="Customer Down Payment" value={formData.payment.downPayment} onChange={v => handleDeepChange('payment', 'downPayment', v)} theme={theme} />
                           <Input label="Customer Paid Amount" value={formData.payment.paidAmount} onChange={v => handleDeepChange('payment', 'paidAmount', v)} theme={theme} />
                           <div><label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Payment Type</label><select value={formData.payment.type} onChange={e => handleDeepChange('payment', 'type', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}><option>CASH</option><option>ONLINE</option><option>CHEQUE</option></select></div>
                           <Input label="Payment Date" type="date" value={formData.payment.date} onChange={v => handleDeepChange('payment', 'date', v)} theme={theme} />

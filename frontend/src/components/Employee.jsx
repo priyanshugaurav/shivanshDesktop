@@ -13,6 +13,71 @@ import {
     AreaChart, Area, PieChart, Pie, Cell, RadialBarChart, RadialBar
 } from 'recharts';
 
+const PayrollCalendar = ({ month, year, selectedDates, onSelectDate, theme }) => {
+    const monthIndex = new Date(`${month} 1, 2000`).getMonth();
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const firstDay = new Date(year, monthIndex, 1).getDay(); // 0 is Sunday
+    
+    const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    const blanks = Array.from({ length: firstDay }, (_, i) => i);
+
+    return (
+        <div className="bg-slate-50 p-6 rounded-[1.5rem] border border-slate-100 shadow-inner mt-6 w-full">
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h3 className="text-sm font-black text-slate-900">Select Payable Days</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{selectedDates.length} days selected</p>
+                </div>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => onSelectDate(days.map(d => d.toString()))} 
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all bg-emerald-50 text-emerald-600 hover:bg-emerald-100`}
+                    >
+                        Select All
+                    </button>
+                    <button 
+                        onClick={() => onSelectDate([])} 
+                        className="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-rose-50 text-rose-600 hover:bg-rose-100"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2 sm:gap-3 mb-2">
+                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                    <div key={day} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{day}</div>
+                ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2 sm:gap-3">
+                {blanks.map(b => <div key={`blank-${b}`} className="aspect-square"></div>)}
+                {days.map(day => {
+                    const isSelected = selectedDates.includes(day.toString());
+                    return (
+                        <button
+                            key={day}
+                            onClick={() => {
+                                const dayStr = day.toString();
+                                if (isSelected) {
+                                    onSelectDate(selectedDates.filter(d => d !== dayStr));
+                                } else {
+                                    onSelectDate([...selectedDates, dayStr]);
+                                }
+                            }}
+                            className={`aspect-square rounded-2xl flex items-center justify-center text-xs sm:text-sm font-black transition-all ${
+                                isSelected 
+                                ? `${theme.primary} text-white shadow-lg scale-105 shadow-${theme.primary.split('-')[1]}-200/50` 
+                                : 'bg-white text-slate-600 hover:bg-slate-100 hover:scale-105 border border-slate-200/60 shadow-sm'
+                            }`}
+                        >
+                            {day}
+                        </button>
+                    )
+                })}
+            </div>
+        </div>
+    );
+};
+
 const Employee = ({ theme: t }) => {
     const [viewMode, setViewMode] = useState('list'); // 'list' | 'detail' | 'add'
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'sales', 'payroll', 'attendance', 'salary_history', 'docs'
@@ -24,6 +89,7 @@ const Employee = ({ theme: t }) => {
     // New Salary/Payroll States
     const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedDates, setSelectedDates] = useState([]);
     const [salaryHistory, setSalaryHistory] = useState([]);
     const [isProcessing, setIsProcessing] = useState(false);
     const [otherAmount, setOtherAmount] = useState(0);
@@ -291,8 +357,17 @@ const Employee = ({ theme: t }) => {
         if (!selectedEmp) return;
         setIsProcessing(true);
         try {
+            const monthIndex = new Date(`${selectedMonth} 1, 2000`).getMonth();
+            const totalDaysInMonth = new Date(selectedYear, monthIndex + 1, 0).getDate();
+            const payableDays = selectedDates.length || totalDaysInMonth; // default to full month if no dates selected for backwards compatibility, or maybe just what they selected? Let's use what they selected. Wait, if they select nothing, should it be 0? The plan said we default to none or all. Actually let's use selectedDates.length.
+            
+            // Pro-rated calculation
+            const proRatedBase = selectedDates.length > 0 ? (selectedEmp.financial.baseSalary / totalDaysInMonth) * selectedDates.length : selectedEmp.financial.baseSalary;
+            const proRatedAllowance = selectedDates.length > 0 ? (selectedEmp.financial.allowance / totalDaysInMonth) * selectedDates.length : selectedEmp.financial.allowance;
+
             const totalIncentives = (selectedEmp.financial.incentives || 0) + monthlySales.commission;
-            const totalPayable = selectedEmp.financial.baseSalary + selectedEmp.financial.allowance + totalIncentives - selectedEmp.financial.tax + Number(otherAmount);
+            const totalPayable = proRatedBase + proRatedAllowance + totalIncentives - selectedEmp.financial.tax + Number(otherAmount);
+
             const res = await fetch(`/api/employees/${selectedEmp._id}/payroll`, {
                 method: 'POST',
                 headers: {
@@ -302,13 +377,16 @@ const Employee = ({ theme: t }) => {
                 body: JSON.stringify({
                     month: selectedMonth,
                     year: selectedYear,
-                    baseSalary: selectedEmp.financial.baseSalary,
-                    allowance: selectedEmp.financial.allowance,
+                    baseSalary: Math.round(proRatedBase),
+                    allowance: Math.round(proRatedAllowance),
                     incentives: totalIncentives,
                     tax: selectedEmp.financial.tax,
                     otherAmount: Number(otherAmount),
                     remark: payRemark,
-                    totalPayable
+                    totalPayable: Math.round(totalPayable),
+                    payableDays: selectedDates.length > 0 ? selectedDates.length : totalDaysInMonth,
+                    totalDaysInMonth,
+                    selectedDates
                 })
             });
             
@@ -953,7 +1031,7 @@ const Employee = ({ theme: t }) => {
                                 <div className="flex items-center gap-3 w-full sm:w-auto">
                                     <select 
                                         value={selectedMonth} 
-                                        onChange={(e) => setSelectedMonth(e.target.value)}
+                                        onChange={(e) => { setSelectedMonth(e.target.value); setSelectedDates([]); }}
                                         className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
                                     >
                                         {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
@@ -962,7 +1040,7 @@ const Employee = ({ theme: t }) => {
                                     </select>
                                     <select 
                                         value={selectedYear} 
-                                        onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                        onChange={(e) => { setSelectedYear(Number(e.target.value)); setSelectedDates([]); }}
                                         className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-slate-100"
                                     >
                                         {[2024, 2025, 2026].map(y => (
@@ -971,6 +1049,14 @@ const Employee = ({ theme: t }) => {
                                     </select>
                                 </div>
                             </div>
+                            
+                            <PayrollCalendar 
+                                month={selectedMonth} 
+                                year={selectedYear} 
+                                selectedDates={selectedDates} 
+                                onSelectDate={setSelectedDates} 
+                                theme={t} 
+                            />
 
                             {/* Digital Salary Slip */}
                             <div className="bg-slate-900 rounded-[2rem] p-8 text-white relative overflow-hidden shadow-2xl">
@@ -978,8 +1064,19 @@ const Employee = ({ theme: t }) => {
                                 <div className="relative z-10">
                                     <div className="flex justify-between items-start mb-8">
                                         <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Total Payable ({selectedMonth})</p>
-                                            <h2 className="text-5xl font-black tracking-tight">₹ {(selectedEmp.financial.baseSalary + selectedEmp.financial.allowance + (selectedEmp.financial.incentives || 0) + monthlySales.commission - selectedEmp.financial.tax + Number(otherAmount)).toLocaleString()}</h2>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">
+                                                Total Payable ({selectedMonth} {selectedDates.length > 0 ? `- ${selectedDates.length} Days` : ''})
+                                            </p>
+                                            <h2 className="text-5xl font-black tracking-tight">
+                                                ₹ {(() => {
+                                                    const monthIdx = new Date(`${selectedMonth} 1, 2000`).getMonth();
+                                                    const tDays = new Date(selectedYear, monthIdx + 1, 0).getDate();
+                                                    const proBase = selectedDates.length > 0 ? (selectedEmp.financial.baseSalary / tDays) * selectedDates.length : selectedEmp.financial.baseSalary;
+                                                    const proAllow = selectedDates.length > 0 ? (selectedEmp.financial.allowance / tDays) * selectedDates.length : selectedEmp.financial.allowance;
+                                                    const tot = proBase + proAllow + (selectedEmp.financial.incentives || 0) + monthlySales.commission - selectedEmp.financial.tax + Number(otherAmount);
+                                                    return Math.round(tot).toLocaleString();
+                                                })()}
+                                            </h2>
                                         </div>
                                         <div className="text-right">
                                             <div className="inline-block p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
@@ -991,11 +1088,23 @@ const Employee = ({ theme: t }) => {
                                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-6 p-6 bg-white/5 rounded-3xl border border-white/5 backdrop-blur-sm">
                                         <div>
                                             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Base Salary</p>
-                                            <p className="text-lg font-bold">₹ {selectedEmp.financial.baseSalary}</p>
+                                            <p className="text-lg font-bold">
+                                                ₹ {(() => {
+                                                    const monthIdx = new Date(`${selectedMonth} 1, 2000`).getMonth();
+                                                    const tDays = new Date(selectedYear, monthIdx + 1, 0).getDate();
+                                                    return selectedDates.length > 0 ? Math.round((selectedEmp.financial.baseSalary / tDays) * selectedDates.length).toLocaleString() : selectedEmp.financial.baseSalary.toLocaleString();
+                                                })()}
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Allowances</p>
-                                            <p className="text-lg font-bold">₹ {selectedEmp.financial.allowance}</p>
+                                            <p className="text-lg font-bold">
+                                                ₹ {(() => {
+                                                    const monthIdx = new Date(`${selectedMonth} 1, 2000`).getMonth();
+                                                    const tDays = new Date(selectedYear, monthIdx + 1, 0).getDate();
+                                                    return selectedDates.length > 0 ? Math.round((selectedEmp.financial.allowance / tDays) * selectedDates.length).toLocaleString() : selectedEmp.financial.allowance.toLocaleString();
+                                                })()}
+                                            </p>
                                         </div>
                                         <div>
                                             <p className="text-[9px] font-bold text-slate-400 uppercase mb-1">Sales Comm.</p>

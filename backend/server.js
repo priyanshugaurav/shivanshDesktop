@@ -141,9 +141,7 @@ const AgreementSchema = new mongoose.Schema({
     registration: String,
     onlinePayment: String,
     permit: String,
-    total: String,
-    upper: String,
-    lower: String
+    total: String
   },
   broker: {
     name: String,
@@ -173,6 +171,7 @@ const AgreementSchema = new mongoose.Schema({
     tds: String,
     finalNetProfit: String
   },
+  magadhMargin: String,
   registrationNo: String,
   permitNo: String,
   permitDate: Date,
@@ -230,6 +229,9 @@ const SalaryRecordSchema = new mongoose.Schema({
   otherAmount: { type: Number, default: 0 },
   remark: { type: String, default: '' },
   totalPayable: Number,
+  payableDays: { type: Number, default: 30 },
+  totalDaysInMonth: { type: Number, default: 30 },
+  selectedDates: [{ type: String }],
   paymentDate: { type: Date, default: Date.now },
   status: { type: String, enum: ['Paid', 'Pending', 'Adjusted'], default: 'Paid' },
   createdAt: { type: Date, default: Date.now }
@@ -1270,7 +1272,7 @@ app.delete('/api/employees/:id', verifyToken, async (req, res) => {
 // Process Payroll (Monthly Salary Record)
 app.post('/api/employees/:id/payroll', verifyToken, async (req, res) => {
   try {
-    const { month, year, baseSalary, allowance, incentives, tax, otherAmount, remark, totalPayable } = req.body;
+    const { month, year, baseSalary, allowance, incentives, tax, otherAmount, remark, totalPayable, payableDays, totalDaysInMonth, selectedDates } = req.body;
     
     // Check if duplicate for the same month/year
     const existing = await SalaryRecord.findOne({ employeeId: req.params.id, month, year });
@@ -1287,6 +1289,9 @@ app.post('/api/employees/:id/payroll', verifyToken, async (req, res) => {
       otherAmount,
       remark,
       totalPayable,
+      payableDays,
+      totalDaysInMonth,
+      selectedDates,
       status: 'Paid'
     });
     
