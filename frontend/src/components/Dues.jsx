@@ -12,6 +12,7 @@ const Dues = ({ theme: t }) => {
     const [selectedDue, setSelectedDue] = useState(null);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [duesData, setDuesData] = useState([]);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -62,6 +63,7 @@ const Dues = ({ theme: t }) => {
         setSelectedDue(due);
         setPaymentAmount('');
         setPaymentMethod('Cash');
+        setPaymentDate(new Date().toISOString().split('T')[0]);
         setViewMode('payment');
     };
 
@@ -79,7 +81,8 @@ const Dues = ({ theme: t }) => {
                 body: JSON.stringify({
                     agreementId: selectedDue.mongodbId,
                     amount: paymentAmount,
-                    method: paymentMethod
+                    method: paymentMethod,
+                    date: paymentDate
                 })
             });
 
@@ -346,22 +349,37 @@ const Dues = ({ theme: t }) => {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {['Cash', 'UPI', 'Cheque'].map(method => (
-                                            <button 
-                                                key={method} 
-                                                onClick={() => setPaymentMethod(method)}
-                                                className={`py-2.5 rounded-xl border-2 text-[10px] font-bold transition-all ${
-                                                    paymentMethod === method 
-                                                    ? 'border-slate-900 bg-slate-900 text-white' 
-                                                    : 'border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                                                }`}
-                                            >
-                                                {method}
-                                            </button>
-                                        ))}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['Cash', 'UPI', 'Cheque'].map(method => (
+                                                <button 
+                                                    key={method} 
+                                                    onClick={() => setPaymentMethod(method)}
+                                                    className={`py-2.5 rounded-xl border-2 text-[10px] font-bold transition-all ${
+                                                        paymentMethod === method 
+                                                        ? 'border-slate-900 bg-slate-900 text-white' 
+                                                        : 'border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {method}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Date</label>
+                                        <div className="relative group">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-600 transition-colors" size={16} />
+                                            <input 
+                                                type="date"
+                                                value={paymentDate}
+                                                onChange={(e) => setPaymentDate(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-[11px] bg-white border-2 border-slate-100 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-300 transition-all shadow-sm"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

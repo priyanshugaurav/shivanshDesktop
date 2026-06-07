@@ -1158,7 +1158,7 @@ app.get('/api/dues', verifyToken, async (req, res) => {
 
 app.post('/api/dues/collect', verifyToken, async (req, res) => {
   try {
-    const { agreementId, amount, method } = req.body;
+    const { agreementId, amount, method, date } = req.body;
     const agreement = await Agreement.findById(agreementId);
     if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
 
@@ -1167,7 +1167,8 @@ app.post('/api/dues/collect', verifyToken, async (req, res) => {
       agreementId: agreement._id,
       customerId: agreement.customerId,
       amount: Number(amount),
-      method: method || 'Cash'
+      method: method || 'Cash',
+      date: date ? new Date(date) : new Date()
     });
 
     // 2. Update Agreement Balance
