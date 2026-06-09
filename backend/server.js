@@ -472,6 +472,30 @@ app.get('/api/customers', verifyToken, async (req, res) => {
   }
 });
 
+app.get('/api/customers/export', verifyToken, async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const challans = await Challan.find().lean();
+    const agreements = await Agreement.find().lean();
+
+    const result = customers.map(c => {
+      const customerIdStr = c._id.toString();
+      const challan = challans.find(ch => ch.customer.toString() === customerIdStr);
+      const agreement = agreements.find(ag => ag.customerId.toString() === customerIdStr);
+
+      return {
+        customer: c,
+        challan: challan || null,
+        agreement: agreement || null
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/customers', verifyToken, async (req, res) => {
   try {
     const { personal, address } = req.body;

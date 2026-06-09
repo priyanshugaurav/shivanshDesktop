@@ -34,28 +34,57 @@ const ActionModal = ({ customer, onClose, onNavigate, theme }) => {
       { id: 'agreement', label: 'Rental Agreement', date: isAgreementDone ? 'Completed' : '-' },
   ];
 
-  const exportCustomerData = () => {
-    const ws = XLSX.utils.json_to_sheet([{
-      "Customer ID": customer.id,
-      "Name": customer.name,
-      "Email": customer.email || 'N/A',
-      "Address": customer.address,
-      "Pincode": customer.pincode || 'N/A',
-      "Created At": new Date(customer.createdAt).toLocaleDateString(),
-      "Challan Status": isChallanDone ? 'Completed' : 'Pending',
-      "Agreement Status": isAgreementDone ? 'Completed' : 'Pending'
-    }]);
-    
-    // Auto-size columns nicely
-    const colWidths = [
-      { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 40 }, 
-      { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 18 }
-    ];
-    ws['!cols'] = colWidths;
-    
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "CustomerData");
-    XLSX.writeFile(wb, `${customer.name}_Data.xlsx`);
+  const exportCustomerData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      let challan = null;
+      let agreement = null;
+      
+      const cRes = await fetch(`${API_URL}/challan/${customer.originalId}`, { headers: { 'Authorization': token } });
+      if (cRes.ok) challan = await cRes.json();
+      
+      const aRes = await fetch(`${API_URL}/agreement/${customer.originalId}`, { headers: { 'Authorization': token } });
+      if (aRes.ok) agreement = await aRes.json();
+
+      const ws = XLSX.utils.json_to_sheet([{
+        "Customer ID": customer.id,
+        "Name": customer.name,
+        "Email": customer.email || 'N/A',
+        "Address": customer.address,
+        "Pincode": customer.pincode || 'N/A',
+        "Created At": new Date(customer.createdAt).toLocaleDateString(),
+        "Challan Status": isChallanDone ? 'Completed' : 'Pending',
+        "Agreement Status": isAgreementDone ? 'Completed' : 'Pending',
+        " ": "", // spacer
+        "Challan No": challan?.details?.challanNo || 'N/A',
+        "Model": challan?.details?.model || 'N/A',
+        "Chassis No": challan?.engine?.frameNo || 'N/A',
+        "Motor No": challan?.engine?.motorNo || 'N/A',
+        "  ": "", // spacer
+        "Agreement ID": agreement?.agreementId || 'N/A',
+        "Total On Road": agreement?.model?.onRoadPrice || 'N/A',
+        "Down Payment": agreement?.payment?.downPayment || 'N/A',
+        "Paid Amount": agreement?.payment?.paidAmount || 'N/A',
+        "Dues": agreement?.payment?.dues || 'N/A',
+        "Net Dues": agreement?.payment?.netDues || 'N/A',
+      }]);
+      
+      const colWidths = [
+        { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 40 }, 
+        { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 18 },
+        { wch: 5 }, // spacer
+        { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+        { wch: 5 }, // spacer
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+      ];
+      ws['!cols'] = colWidths;
+      
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "CustomerData");
+      XLSX.writeFile(wb, `${customer.name}_Data.xlsx`);
+    } catch (err) {
+      console.error("Export error", err);
+    }
   };
 
   return (
@@ -1681,30 +1710,59 @@ const Sales = ({ theme }) => {
       setView('add-agreement');
   };
 
-  const handleExportAllData = () => {
+  const handleExportAllData = async () => {
     if (customers.length === 0) return;
-    const exportData = customers.map(c => ({
-      "Customer ID": c.id,
-      "Name": c.name,
-      "Email": c.email || 'N/A',
-      "Address": c.address,
-      "Pincode": c.pincode || 'N/A',
-      "Created At": new Date(c.createdAt).toLocaleDateString(),
-      "Challan Status": c.pipeline.challan ? 'Completed' : 'Pending',
-      "Agreement Status": c.pipeline.agreement ? 'Completed' : 'Pending'
-    }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    
-    // Auto-size columns nicely
-    const colWidths = [
-      { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 40 }, 
-      { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 18 }
-    ];
-    ws['!cols'] = colWidths;
-    
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "All Customers");
-    XLSX.writeFile(wb, "All_Customers_Data.xlsx");
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/customers/export`, { headers: { 'Authorization': token } });
+      const aggregatedData = await res.json();
+
+      const exportData = aggregatedData.map(item => {
+        const c = item.customer;
+        const challan = item.challan;
+        const agreement = item.agreement;
+
+        return {
+          "Customer ID": c.generatedId,
+          "Name": c.personal ? `${c.personal.firstName} ${c.personal.lastName}` : 'N/A',
+          "Email": c.personal?.email || 'N/A',
+          "Phone": c.personal?.phone || 'N/A',
+          "Address": c.address ? `${c.address.village}, ${c.address.district}` : 'N/A',
+          "Pincode": c.address?.pincode || 'N/A',
+          "Created At": new Date(c.createdAt).toLocaleDateString(),
+          " ": "", // spacer
+          "Challan No": challan?.details?.challanNo || 'N/A',
+          "Model": challan?.details?.model || 'N/A',
+          "Chassis No": challan?.engine?.frameNo || 'N/A',
+          "Motor No": challan?.engine?.motorNo || 'N/A',
+          "  ": "", // spacer
+          "Agreement ID": agreement?.agreementId || 'N/A',
+          "Total On Road": agreement?.model?.onRoadPrice || 'N/A',
+          "Down Payment": agreement?.payment?.downPayment || 'N/A',
+          "Paid Amount": agreement?.payment?.paidAmount || 'N/A',
+          "Dues": agreement?.payment?.dues || 'N/A',
+          "Net Dues": agreement?.payment?.netDues || 'N/A',
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      const colWidths = [
+        { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 40 }, 
+        { wch: 12 }, { wch: 15 }, 
+        { wch: 5 }, // spacer
+        { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+        { wch: 5 }, // spacer
+        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+      ];
+      ws['!cols'] = colWidths;
+      
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "All Customers");
+      XLSX.writeFile(wb, "All_Customers_Data.xlsx");
+    } catch (err) {
+      console.error("Export all error", err);
+    }
   };
 
   if (view === 'add') return <AddRecord theme={theme} onBack={() => setView('list')} onSuccess={handleRefresh} />;
