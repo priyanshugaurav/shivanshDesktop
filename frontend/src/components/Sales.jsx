@@ -12,6 +12,7 @@ import {
   // New Icons
   Printer, Car, ScrollText, Landmark, UserCheck, Calculator, Share2, Package
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // --- CONFIGURATION —— uses env var in production, relative /api in dev (Vite proxy) ---
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
@@ -32,6 +33,30 @@ const ActionModal = ({ customer, onClose, onNavigate, theme }) => {
       { id: 'challan', label: 'Vehicle Challan', date: isChallanDone ? 'Completed' : '-' },
       { id: 'agreement', label: 'Rental Agreement', date: isAgreementDone ? 'Completed' : '-' },
   ];
+
+  const exportCustomerData = () => {
+    const ws = XLSX.utils.json_to_sheet([{
+      "Customer ID": customer.id,
+      "Name": customer.name,
+      "Email": customer.email || 'N/A',
+      "Address": customer.address,
+      "Pincode": customer.pincode || 'N/A',
+      "Created At": new Date(customer.createdAt).toLocaleDateString(),
+      "Challan Status": isChallanDone ? 'Completed' : 'Pending',
+      "Agreement Status": isAgreementDone ? 'Completed' : 'Pending'
+    }]);
+    
+    // Auto-size columns nicely
+    const colWidths = [
+      { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 40 }, 
+      { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 18 }
+    ];
+    ws['!cols'] = colWidths;
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "CustomerData");
+    XLSX.writeFile(wb, `${customer.name}_Data.xlsx`);
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
@@ -137,7 +162,10 @@ const ActionModal = ({ customer, onClose, onNavigate, theme }) => {
             
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
                 <button className="text-xs font-bold text-slate-400 hover:text-rose-500 flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
-                <div className="flex gap-3"><button onClick={onClose} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">Close</button></div>
+                <div className="flex gap-3">
+                    <button onClick={exportCustomerData} className={`px-4 py-2 text-white border border-transparent shadow-sm hover:shadow-md hover:-translate-y-0.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${theme.primary}`}><Download className="h-3.5 w-3.5" /> Export Excel</button>
+                    <button onClick={onClose} className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">Close</button>
+                </div>
             </div>
         </div>
       </div>
@@ -1653,6 +1681,32 @@ const Sales = ({ theme }) => {
       setView('add-agreement');
   };
 
+  const handleExportAllData = () => {
+    if (customers.length === 0) return;
+    const exportData = customers.map(c => ({
+      "Customer ID": c.id,
+      "Name": c.name,
+      "Email": c.email || 'N/A',
+      "Address": c.address,
+      "Pincode": c.pincode || 'N/A',
+      "Created At": new Date(c.createdAt).toLocaleDateString(),
+      "Challan Status": c.pipeline.challan ? 'Completed' : 'Pending',
+      "Agreement Status": c.pipeline.agreement ? 'Completed' : 'Pending'
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    
+    // Auto-size columns nicely
+    const colWidths = [
+      { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 40 }, 
+      { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 18 }
+    ];
+    ws['!cols'] = colWidths;
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "All Customers");
+    XLSX.writeFile(wb, "All_Customers_Data.xlsx");
+  };
+
   if (view === 'add') return <AddRecord theme={theme} onBack={() => setView('list')} onSuccess={handleRefresh} />;
   
   if (view === 'view-challan') {
@@ -1679,7 +1733,7 @@ const Sales = ({ theme }) => {
         <div><h1 className="text-2xl font-bold text-slate-900 tracking-tight">Customer Management</h1><p className="text-sm text-slate-500 mt-1">Manage profiles and document pipelines.</p></div>
         <div className="flex gap-2">
            <button className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 text-xs font-bold text-slate-600 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"><Calendar className="h-3.5 w-3.5 text-gray-400" /><span>Filter Date</span><ChevronDown className="h-3.5 w-3.5 text-gray-300" /></button>
-           <button className={`flex items-center gap-2 px-3 py-2 text-xs font-bold text-white rounded-lg shadow-md shadow-gray-200 hover:-translate-y-0.5 transition-all ${theme.primary}`}><Download className="h-3.5 w-3.5" /><span>Export</span></button>
+           <button onClick={handleExportAllData} className={`flex items-center gap-2 px-3 py-2 text-xs font-bold text-white rounded-lg shadow-md shadow-gray-200 hover:-translate-y-0.5 transition-all ${theme.primary}`}><Download className="h-3.5 w-3.5" /><span>Export</span></button>
         </div>
       </div>
 
