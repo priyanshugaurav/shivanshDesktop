@@ -30,7 +30,6 @@ const SpareStockDashboard = ({ theme: t }) => {
     // Add Stock Form State
     const initialStockForm = {
         name: '',
-        amount: '',
         qty: '',
         purchaseRate: '',
         status: 'Available'
@@ -133,7 +132,6 @@ const SpareStockDashboard = ({ theme: t }) => {
             const payload = {
                 ...stockForm,
                 categoryId: selectedCategory._id,
-                amount: Number(stockForm.amount) || 0,
                 qty: Number(stockForm.qty) || 0,
                 purchaseRate: Number(stockForm.purchaseRate) || 0,
             };
@@ -175,7 +173,7 @@ const SpareStockDashboard = ({ theme: t }) => {
             "Item Name": stock.name || '',
             "Quantity": stock.qty || 0,
             "Purchase Rate": stock.purchaseRate || 0,
-            "Amount (Selling)": stock.amount || 0,
+            "Total": (stock.qty || 0) * (stock.purchaseRate || 0),
             "Status": stock.status || 'Available',
             "Added On": stock.createdAt ? new Date(stock.createdAt).toLocaleDateString() : ''
         }));
@@ -381,23 +379,13 @@ const SpareStockDashboard = ({ theme: t }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 gap-4">
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-slate-500 uppercase">Purchase Rate (₹)</label>
                                         <input 
                                             type="number" 
                                             value={stockForm.purchaseRate}
                                             onChange={(e) => setStockForm({...stockForm, purchaseRate: e.target.value})}
-                                            className="w-full h-10 px-3 rounded border border-slate-200 font-mono font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Amount / Selling Price (₹)</label>
-                                        <input 
-                                            type="number" 
-                                            value={stockForm.amount}
-                                            onChange={(e) => setStockForm({...stockForm, amount: e.target.value})}
                                             className="w-full h-10 px-3 rounded border border-slate-200 font-mono font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
                                             placeholder="0.00"
                                         />
@@ -458,7 +446,7 @@ const SpareStockDashboard = ({ theme: t }) => {
                                             <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Item Name</th>
                                             <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Quantity</th>
                                             <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Purchase Rate</th>
-                                            <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Amount (Sell)</th>
+                                            <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Total</th>
                                             <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -478,7 +466,7 @@ const SpareStockDashboard = ({ theme: t }) => {
                                                     <span className="font-mono text-xs font-bold text-slate-500">₹ {item.purchaseRate?.toLocaleString()}</span>
                                                 </td>
                                                 <td className="py-3 px-4 text-right">
-                                                    <span className="font-mono text-xs font-bold text-emerald-600">₹ {item.amount?.toLocaleString()}</span>
+                                                    <span className="font-mono text-xs font-bold text-emerald-600">₹ {((item.qty || 0) * (item.purchaseRate || 0)).toLocaleString()}</span>
                                                 </td>
                                                 <td className="py-3 px-4 text-right">
                                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -487,7 +475,6 @@ const SpareStockDashboard = ({ theme: t }) => {
                                                                 setEditingStock(item);
                                                                 setStockForm({
                                                                     name: item.name,
-                                                                    amount: item.amount,
                                                                     qty: item.qty,
                                                                     purchaseRate: item.purchaseRate,
                                                                     status: item.status

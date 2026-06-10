@@ -70,7 +70,7 @@ const SpareBilling = ({ theme: t }) => {
             
             if (inStock.length > 0) {
                 setSelectedSpareId(inStock[0]._id);
-                setSelectedSparePrice(inStock[0].amount);
+                setSelectedSparePrice('');
             } else {
                 setSelectedSpareId('');
                 setSelectedSparePrice(0);
@@ -99,7 +99,7 @@ const SpareBilling = ({ theme: t }) => {
         if (selectedSpareId) {
             const spare = availableSpares.find(s => s._id === selectedSpareId);
             if (spare) {
-                setSelectedSparePrice(spare.amount);
+                setSelectedSparePrice('');
             }
         }
     }, [selectedSpareId]);

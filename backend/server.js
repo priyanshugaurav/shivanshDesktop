@@ -320,7 +320,6 @@ const SpareCategory = mongoose.models.SpareCategory || mongoose.model('SpareCate
 const SpareStockSchema = new mongoose.Schema({
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareCategory', required: true },
   name: { type: String, required: true, trim: true },
-  amount: { type: Number, default: 0 },
   qty: { type: Number, default: 0 },
   purchaseRate: { type: Number, default: 0 },
   status: { type: String, enum: ['Available', 'Out of Stock'], default: 'Available' },
