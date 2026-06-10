@@ -1135,11 +1135,12 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       { $unwind: '$model' },
       { $group: { _id: '$model.name', count: { $sum: 1 } } }
     ]);
-
-    const availablePerModel = availableStockResults.map(r => ({
-      name: r._id,
-      count: r.count
-    }));
+    const availablePerModel = availableStockResults
+      .filter(r => r._id && r._id.toUpperCase() !== 'BAJAJ')
+      .map(r => ({
+        name: r._id,
+        count: r.count
+      }));
 
     const totalAvailable = availablePerModel.reduce((acc, curr) => acc + curr.count, 0);
 
