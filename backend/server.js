@@ -970,27 +970,26 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
     const agreements = await Agreement.find(agreementQuery).sort({ createdAt: 1 });
 
     let expenseQuery = {};
+    const monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const shortToFull = { "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April", "May": "May", "Jun": "June", "Jul": "July", "Aug": "August", "Sep": "September", "Oct": "October", "Nov": "November", "Dec": "December" };
+    
     if (range) {
         if (range === 'This Month') {
-            const start = new Date(now.getFullYear(), now.getMonth(), 1);
-            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-            expenseQuery['createdAt'] = { $gte: start, $lte: end };
+            expenseQuery.month = monthsFull[now.getMonth()];
+            expenseQuery.year = now.getFullYear();
         } else if (range === 'Last Month') {
-            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-            expenseQuery['createdAt'] = { $gte: start, $lte: end };
+            const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            expenseQuery.month = monthsFull[lastMonthDate.getMonth()];
+            expenseQuery.year = lastMonthDate.getFullYear();
         } else if (range === 'Custom Month' && month && year) {
-            const monthIdx = new Date(`${month} 1, 2000`).getMonth();
-            const start = new Date(year, monthIdx, 1);
-            const end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
-            expenseQuery['createdAt'] = { $gte: start, $lte: end };
+            expenseQuery.month = shortToFull[month] || month;
+            expenseQuery.year = Number(year);
         } else if (range === 'All Time') {
             expenseQuery = {}; 
         }
     } else {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        expenseQuery['createdAt'] = { $gte: start, $lte: end };
+        expenseQuery.month = monthsFull[now.getMonth()];
+        expenseQuery.year = now.getFullYear();
     }
     const expenses = await Expense.find(expenseQuery);
     const totalExpenses = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
