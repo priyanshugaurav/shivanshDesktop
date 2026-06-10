@@ -465,8 +465,18 @@ app.get('/api/dashboard/stats', verifyToken, async (req, res) => {
 
 app.get('/api/customers', verifyToken, async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
-    res.json(customers);
+    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const challans = await Challan.find({ customer: { $in: customers.map(c => c._id) } }, 'customer details.challanDate').lean();
+    
+    const enrichedCustomers = customers.map(c => {
+      const challan = challans.find(ch => ch.customer.toString() === c._id.toString());
+      return {
+        ...c,
+        challanDate: challan?.details?.challanDate || null
+      };
+    });
+    
+    res.json(enrichedCustomers);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

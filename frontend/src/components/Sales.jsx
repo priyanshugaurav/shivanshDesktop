@@ -1652,7 +1652,8 @@ const Sales = ({ theme }) => {
             address: `${c.address.village}, ${c.address.district}`,
             pincode: c.address.pincode,
             createdAt: c.createdAt,
-            pipeline: c.pipeline
+            pipeline: c.pipeline,
+            challanDate: c.challanDate
         }));
         setCustomers(mappedData);
       }
@@ -1849,7 +1850,7 @@ const Sales = ({ theme }) => {
                    <tr key={i} onClick={() => setSelectedCustomer(c)} className="group hover:bg-gray-50/50 transition-colors relative cursor-pointer">
                       <td className="px-6 py-5 align-middle"><span className="text-xs font-bold text-slate-600 font-mono group-hover:text-slate-900 transition-colors">{c.id}</span></td>
                       <td className="px-6 py-5 align-middle"><div className="flex items-center gap-3"><div className={`h-10 w-10 rounded-full ${theme.light || 'bg-slate-100'} flex items-center justify-center text-slate-500`}><User className="h-5 w-5" /></div><div><p className="text-xs font-bold text-slate-800">{c.name}</p><p className="text-[10px] font-medium text-gray-400">{c.email}</p></div></div></td>
-                      <td className="px-6 py-5 align-middle"><div className="flex flex-col"><span className="text-xs font-medium text-slate-700 truncate max-w-[150px]">{c.address}</span><span className="text-[10px] text-gray-400 font-mono">{c.pincode}</span></div></td>
+                      <td className="px-6 py-5 align-middle"><div className="flex flex-col"><span className="text-xs font-medium text-slate-700 truncate max-w-[150px]">{c.address}</span><span className="text-[10px] text-gray-400 font-mono">{c.pincode}{c.challanDate ? ` • ${new Date(c.challanDate).toLocaleString('default', { month: 'short', year: 'numeric' })}` : ''}</span></div></td>
                       <td className="px-6 py-5 align-middle"><div className="flex justify-center"><StatusPipeline status={c.pipeline} theme={theme} /></div></td>
                       <td className="px-6 py-5 align-middle text-right"><button className="p-2 hover:bg-white hover:shadow-md rounded-lg text-gray-300 hover:text-slate-600 transition-all opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-4 w-4" /></button></td>
                    </tr>
