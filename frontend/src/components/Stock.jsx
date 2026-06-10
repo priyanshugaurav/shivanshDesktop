@@ -4,8 +4,9 @@ import {
     LayoutGrid, Plus, Search, Battery, Zap, Hash, 
     Settings, DollarSign, Package, CheckCircle2, 
     X, FileText, Filter, Tag, Palette, LogOut,
-    Pencil, Trash2, AlertCircle
+    Pencil, Trash2, AlertCircle, Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
@@ -183,6 +184,37 @@ const TechnicalStockDashboard = ({ theme: t }) => {
         }
     };
 
+    const handleExportAllStocks = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/stocks/all/export`, getAuthHeader());
+            const data = res.data.map(stock => ({
+                "Model": stock.modelId?.name || 'Unknown',
+                "Model Type": stock.modelId?.type || 'Unknown',
+                "Variant": stock.variant || '',
+                "Voltage": stock.voltage || '',
+                "Color": stock.color || '',
+                "Status": stock.status || 'Available',
+                "Chassis No": stock.chassisNo || '',
+                "Motor No": stock.motorNo || '',
+                "Battery No": stock.batteryNo || '',
+                "Battery Company": stock.batteryCompany || '',
+                "Charger No": stock.chargerNo || '',
+                "Charger Company": stock.chargerCompany || '',
+                "Purchase Rate": stock.purchaseRate || 0,
+                "HSN Code": stock.hsn || '',
+                "Added On": stock.createdAt ? new Date(stock.createdAt).toLocaleDateString() : ''
+            }));
+            
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+            XLSX.writeFile(wb, "All_Stock_Inventory.xlsx");
+        } catch (err) {
+            console.error("Export Error", err);
+            alert("Failed to export stock data");
+        }
+    };
+
     // --- FILTERING LOGIC ---
     const filteredStocks = stocks.filter(stock => {
         const matchesSearch = stock.chassisNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -306,26 +338,34 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                         )}
                     </div>
                     
-                    {selectedModel && (
-                        <div className="flex gap-3">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search Chassis/Battery..."
-                                    className="h-9 pl-9 pr-4 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:border-blue-400 w-64"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                            <button 
-                                onClick={() => setViewMode('add_stock')}
-                                className={`h-9 px-4 ${t.primary} text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all flex items-center gap-2`}
-                            >
-                                <Plus size={14} /> Add Stock
-                            </button>
-                        </div>
-                    )}
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={handleExportAllStocks}
+                            className="h-9 px-4 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-emerald-100 hover:text-emerald-700 transition-all flex items-center gap-2"
+                        >
+                            <Download size={14} /> Export All
+                        </button>
+                        {selectedModel && (
+                            <>
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search Chassis/Battery..."
+                                        className="h-9 pl-9 pr-4 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold focus:outline-none focus:border-blue-400 w-64"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <button 
+                                    onClick={() => setViewMode('add_stock')}
+                                    className={`h-9 px-4 ${t.primary} text-white rounded-lg text-xs font-bold uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all flex items-center gap-2`}
+                                >
+                                    <Plus size={14} /> Add Stock
+                                </button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {/* --- ADD STOCK FORM VIEW --- */}

@@ -804,6 +804,16 @@ app.delete('/api/models/:id', verifyToken, async (req, res) => {
     }
 });
 
+// 3.01 Get ALL Stocks for Export
+app.get('/api/stocks/all/export', verifyToken, async (req, res) => {
+  try {
+    const stocks = await VehicleStock.find().populate('modelId').sort({ createdAt: -1 });
+    res.json(stocks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 3. Get Stocks for a specific Model (Main Dashboard Table)
 app.get('/api/stocks/:modelId', verifyToken, async (req, res) => {
   try {
