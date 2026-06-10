@@ -968,6 +968,32 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
         : { customerId: { $in: customerIds } };
         
     const agreements = await Agreement.find(agreementQuery).sort({ createdAt: 1 });
+
+    let expenseQuery = {};
+    if (range) {
+        if (range === 'This Month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            expenseQuery['createdAt'] = { $gte: start, $lte: end };
+        } else if (range === 'Last Month') {
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+            expenseQuery['createdAt'] = { $gte: start, $lte: end };
+        } else if (range === 'Custom Month' && month && year) {
+            const monthIdx = new Date(`${month} 1, 2000`).getMonth();
+            const start = new Date(year, monthIdx, 1);
+            const end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+            expenseQuery['createdAt'] = { $gte: start, $lte: end };
+        } else if (range === 'All Time') {
+            expenseQuery = {}; 
+        }
+    } else {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        expenseQuery['createdAt'] = { $gte: start, $lte: end };
+    }
+    const expenses = await Expense.find(expenseQuery);
+    const totalExpenses = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     
     // KPI Aggregation
     const stats = agreements.reduce((acc, curr) => {
@@ -1136,7 +1162,7 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
         { id: 'ev_net_profit', label: 'EV Net Profit', value: `₹ ${formatter.format(stats.evNetProfit)}`, raw: stats.evNetProfit },
         { id: 'bajaj_net_profit', label: 'Bajaj Net Profit', value: `₹ ${formatter.format(stats.bajajNetProfit)}`, raw: stats.bajajNetProfit },
         { id: 'dse_comm', label: 'DSE Payouts', value: `₹ ${formatter.format(stats.dseComm)}`, raw: stats.dseComm }, 
-        { id: 'tds_deduct', label: 'TDS (5%)', value: `₹ ${formatter.format(stats.tds)}`, raw: stats.tds },
+        { id: 'total_expenses', label: 'Total Expenses', value: `₹ ${formatter.format(totalExpenses)}`, raw: totalExpenses },
         { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${formatter.format(stats.pendingDues)}`, raw: stats.pendingDues }
       ],
       financialMixedData,

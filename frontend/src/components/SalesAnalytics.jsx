@@ -77,7 +77,7 @@ const SalesAnalytics = ({ theme: t }) => {
             { id: 'ev_net_profit', icon: Zap, sub: 'EV Operations', variant: 'dark', progress: 90 },
             { id: 'bajaj_net_profit', icon: Briefcase, sub: 'Bajaj Operations', variant: 'dark', progress: 85 },
             { id: 'dse_comm', icon: Users, sub: 'Dealer Commissions', variant: 'white', progress: 45 },
-            { id: 'tds_deduct', icon: Percent, sub: 'Govt. Tax Deducted', variant: 'white', progress: 20 },
+            { id: 'total_expenses', icon: AlertCircle, sub: 'Total Business Expenses', variant: 'white', progress: 20 },
             { id: 'dues_pending', icon: AlertCircle, sub: 'Accounts Receivable', variant: 'white', progress: 65 }
         ].find(m => m.id === kpi.id);
 
