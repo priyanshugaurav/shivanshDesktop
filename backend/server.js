@@ -731,10 +731,13 @@ app.get('/api/models', verifyToken, async (req, res) => {
     
     // Add "stockCount" to each model
     const modelsWithCount = await Promise.all(models.map(async (model) => {
-      const count = await VehicleStock.countDocuments({ 
-        modelId: model._id, 
-        status: 'Available' 
-      });
+      let count = 0;
+      if (model.name && model.name.toUpperCase() !== 'BAJAJ') {
+        count = await VehicleStock.countDocuments({ 
+          modelId: model._id, 
+          status: 'Available' 
+        });
+      }
       return { ...model.toObject(), stockCount: count };
     }));
 
