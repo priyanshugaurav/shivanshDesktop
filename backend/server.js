@@ -1030,7 +1030,17 @@ app.get('/api/analytics/sales', verifyToken, async (req, res) => {
       monthlyMap[monthLabel].profit += (parseFloat(agg.dse.finalNetProfit) || 0);
     });
 
-    const financialMixedData = Object.values(monthlyMap);
+    expenses.forEach(exp => {
+      if (exp.month) {
+        const monthLabel = exp.month.substring(0, 3);
+        if (!monthlyMap[monthLabel]) {
+          monthlyMap[monthLabel] = { name: monthLabel, revenue: 0, expenses: 0, profit: 0 };
+        }
+        monthlyMap[monthLabel].expenses += (parseFloat(exp.amount) || 0);
+      }
+    });
+
+    const financialMixedData = Object.values(monthlyMap).sort((a, b) => months.indexOf(a.name) - months.indexOf(b.name));
 
     // Model Distribution
     const modelMap = {};
