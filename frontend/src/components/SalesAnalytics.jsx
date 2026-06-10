@@ -300,20 +300,16 @@ const SalesAnalytics = ({ theme: t }) => {
                     <div className="flex items-center justify-between mb-6">
                         <div>
                             <h3 className="text-sm font-bold text-slate-900">Financial Overview</h3>
-                            <p className="text-[10px] text-slate-500 font-medium">Revenue vs. Expenses vs. Profit (In Lakhs)</p>
+                            <p className="text-[10px] text-slate-500 font-medium">Net Profit vs. Expenses (In Lakhs)</p>
                         </div>
                         <div className="flex items-center gap-4 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                             <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5">
                                 <span className={`w-2 h-2 rounded-full ${t.primary}`}></span>
-                                <span className="text-[9px] font-bold uppercase text-slate-500">Rev</span>
+                                <span className="text-[9px] font-bold uppercase text-slate-500">Net Prof</span>
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-slate-800"></span>
                                 <span className="text-[9px] font-bold uppercase text-slate-500">Exp</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span className="text-[9px] font-bold uppercase text-slate-500">Prof</span>
                             </div>
                         </div>
                     </div>
@@ -321,12 +317,6 @@ const SalesAnalytics = ({ theme: t }) => {
                     <div className="flex-1 w-full min-h-[280px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={financialMixedData} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
-                                <defs>
-                                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor={THEME_COLOR} stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor={THEME_COLOR} stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
                                 <CartesianGrid stroke="#f1f5f9" vertical={false} strokeDasharray="3 3" />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} dy={10} />
                                 <YAxis 
@@ -338,10 +328,12 @@ const SalesAnalytics = ({ theme: t }) => {
                                 <Tooltip 
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontFamily: 'sans-serif' }} 
                                     cursor={{ fill: '#f8fafc' }} 
-                                    formatter={(val) => [`₹ ${new Intl.NumberFormat('en-IN').format(val)}`, '']}
+                                    formatter={(val, name) => [
+                                        `₹ ${new Intl.NumberFormat('en-IN').format(val)}`, 
+                                        name === 'profit' ? 'Net Profit' : name === 'expenses' ? 'Expenses' : name
+                                    ]}
                                 />
-                                <Area type="monotone" dataKey="profit" fill="url(#colorProfit)" stroke={THEME_COLOR} strokeWidth={3} />
-                                <Bar dataKey="revenue" barSize={16} fill="currentColor" className={t.text} radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="profit" barSize={16} fill="currentColor" className={t.text} radius={[4, 4, 0, 0]} />
                                 <Line type="monotone" dataKey="expenses" stroke="#1e293b" strokeWidth={3} dot={{ r: 4, fill: '#1e293b', strokeWidth: 2, stroke: '#fff' }} />
                             </ComposedChart>
                         </ResponsiveContainer>
