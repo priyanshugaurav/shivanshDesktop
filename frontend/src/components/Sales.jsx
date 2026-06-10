@@ -1840,17 +1840,18 @@ const Sales = ({ theme }) => {
 
         <div className="w-full">
            <table className="w-full text-left border-collapse">
-             <thead><tr className="border-b border-gray-200 bg-gray-50/60"><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-24">ID</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Customer</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Details</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Pipeline</th><th className="px-6 py-4 w-12"></th></tr></thead>
+             <thead><tr className="border-b border-gray-200 bg-gray-50/60"><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-24">ID</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Customer</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Details</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Challan Date</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Pipeline</th><th className="px-6 py-4 w-12"></th></tr></thead>
              <tbody className="divide-y divide-gray-100">
                  {loading ? (
-                   <tr><td colSpan="5" className="p-8 text-center text-slate-400 text-xs font-bold">Loading records...</td></tr>
+                   <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs font-bold">Loading records...</td></tr>
                  ) : customers.length === 0 ? (
-                   <tr><td colSpan="5" className="p-8 text-center text-slate-400 text-xs font-bold">No records found. Add a new customer.</td></tr>
+                   <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs font-bold">No records found. Add a new customer.</td></tr>
                  ) : customers.map((c, i) => (
                    <tr key={i} onClick={() => setSelectedCustomer(c)} className="group hover:bg-gray-50/50 transition-colors relative cursor-pointer">
                       <td className="px-6 py-5 align-middle"><span className="text-xs font-bold text-slate-600 font-mono group-hover:text-slate-900 transition-colors">{c.id}</span></td>
                       <td className="px-6 py-5 align-middle"><div className="flex items-center gap-3"><div className={`h-10 w-10 rounded-full ${theme.light || 'bg-slate-100'} flex items-center justify-center text-slate-500`}><User className="h-5 w-5" /></div><div><p className="text-xs font-bold text-slate-800">{c.name}</p><p className="text-[10px] font-medium text-gray-400">{c.email}</p></div></div></td>
-                      <td className="px-6 py-5 align-middle"><div className="flex flex-col"><span className="text-xs font-medium text-slate-700 truncate max-w-[150px]">{c.address}</span><span className="text-[10px] text-gray-400 font-mono">{c.pincode}{c.challanDate ? ` • ${new Date(c.challanDate).toLocaleString('default', { month: 'short', year: 'numeric' })}` : ''}</span></div></td>
+                      <td className="px-6 py-5 align-middle"><div className="flex flex-col"><span className="text-xs font-medium text-slate-700 truncate max-w-[150px]">{c.address}</span></div></td>
+                      <td className="px-6 py-5 align-middle"><span className="text-[11px] font-medium text-slate-600">{c.challanDate ? new Date(c.challanDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</span></td>
                       <td className="px-6 py-5 align-middle"><div className="flex justify-center"><StatusPipeline status={c.pipeline} theme={theme} /></div></td>
                       <td className="px-6 py-5 align-middle text-right"><button className="p-2 hover:bg-white hover:shadow-md rounded-lg text-gray-300 hover:text-slate-600 transition-all opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-4 w-4" /></button></td>
                    </tr>
