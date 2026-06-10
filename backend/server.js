@@ -328,6 +328,21 @@ const SpareStockSchema = new mongoose.Schema({
 });
 const SpareStock = mongoose.models.SpareStock || mongoose.model('SpareStock', SpareStockSchema);
 
+const SpareBillSchema = new mongoose.Schema({
+  customerName: { type: String, required: true, trim: true },
+  customerPhone: { type: String, trim: true },
+  items: [{
+    stockId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareStock', required: true },
+    name: { type: String, required: true },
+    qty: { type: Number, required: true },
+    sellingPrice: { type: Number, required: true }
+  }],
+  totalAmount: { type: Number, required: true },
+  paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque'], default: 'Cash' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SpareBill = mongoose.models.SpareBill || mongoose.model('SpareBill', SpareBillSchema);
+
 // ==========================================
 //  MIDDLEWARE
 // ==========================================
@@ -1760,6 +1775,62 @@ app.delete('/api/spare-stocks/:id', verifyToken, async (req, res) => {
   try {
     await SpareStock.findByIdAndDelete(req.params.id);
     res.json({ message: 'Spare stock deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SPARE BILLS ---
+app.get('/api/spare-bills', verifyToken, async (req, res) => {
+  try {
+    const bills = await SpareBill.find().sort({ createdAt: -1 });
+    res.json(bills);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/spare-bills', verifyToken, async (req, res) => {
+  try {
+    const { customerName, customerPhone, items, paymentMethod, totalAmount } = req.body;
+    
+    // Create bill
+    const bill = new SpareBill({
+      customerName,
+      customerPhone,
+      items,
+      paymentMethod,
+      totalAmount
+    });
+    await bill.save();
+
+    // Decrement stock for each item
+    for (const item of items) {
+      await SpareStock.findByIdAndUpdate(item.stockId, {
+        $inc: { qty: -item.qty }
+      });
+    }
+
+    res.status(201).json(bill);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spare-bills/:id', verifyToken, async (req, res) => {
+  try {
+    const bill = await SpareBill.findById(req.params.id);
+    if (!bill) return res.status(404).json({ message: 'Bill not found' });
+
+    // Restore stock for each item
+    for (const item of bill.items) {
+      await SpareStock.findByIdAndUpdate(item.stockId, {
+        $inc: { qty: item.qty }
+      });
+    }
+
+    await SpareBill.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Bill deleted and stock restored' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

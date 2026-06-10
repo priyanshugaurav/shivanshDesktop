@@ -4,7 +4,7 @@ import {
     Home as HomeIcon, // Aliased to avoid conflict with Home component
     BarChart2, Settings, LogOut, Command,
     LifeBuoy, Bell, Search, Check, ChevronDown, Slash,
-    MessageSquare, CheckCircle, PieChart, FileText, Package, Users, CreditCard, Truck, BookOpen
+    MessageSquare, CheckCircle, PieChart, FileText, Package, Users, CreditCard, Truck, BookOpen, Receipt
 } from 'lucide-react';
 
 // --- COMPONENT IMPORTS ---
@@ -22,6 +22,7 @@ import Home from './Home'; // Imported Home Component
 import Invoice from './Invoice';
 import Ledger from './Ledger';
 import SpareStock from './SpareStock';
+import SpareBilling from './SpareBilling';
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
@@ -82,6 +83,7 @@ const Dashboard = () => {
             title: "System",
             items: [
                 { id: 'spare_stock', label: 'Spare Stock', icon: Package },
+                { id: 'spare_billing', label: 'Spare Billing', icon: Receipt },
                 { id: 'settings', label: 'Settings', icon: Settings },
                 // { id: 'support', label: 'Support', icon: LifeBuoy },
             ]
@@ -100,7 +102,7 @@ const Dashboard = () => {
 
     // --- CONTENT RENDERING HELPER ---
     const renderContent = () => {
-        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice', 'ledger', 'spare_stock'];
+        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice', 'ledger', 'spare_stock', 'spare_billing'];
         
         if (!validTabs.includes(activeTab)) {
              return (
@@ -132,6 +134,7 @@ const Dashboard = () => {
                 { visitedTabs.includes('ledger') && <div className={activeTab === 'ledger' ? 'block' : 'hidden'}><Ledger theme={t} /></div>}
                 { visitedTabs.includes('invoice') && <div className={activeTab === 'invoice' ? 'block' : 'hidden'}><Invoice theme={t} /></div>}
                 { visitedTabs.includes('spare_stock') && <div className={activeTab === 'spare_stock' ? 'block' : 'hidden'}><SpareStock theme={t} /></div>}
+                { visitedTabs.includes('spare_billing') && <div className={activeTab === 'spare_billing' ? 'block' : 'hidden'}><SpareBilling theme={t} /></div>}
             </>
         );
     };
