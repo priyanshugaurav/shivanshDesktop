@@ -3,7 +3,7 @@ import {
     Search, Filter, Download, DollarSign, 
     User, AlertCircle, CheckCircle2, Clock, 
     X, Wallet, CreditCard, ChevronRight, Receipt, Calendar,
-    Smartphone, Hash
+    Smartphone, Hash, Trash2
 } from 'lucide-react';
 
 const Dues = ({ theme: t }) => {
@@ -12,11 +12,11 @@ const Dues = ({ theme: t }) => {
     const [selectedDue, setSelectedDue] = useState(null);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
-    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
     const [duesData, setDuesData] = useState([]);
     const [paymentHistory, setPaymentHistory] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isProcessing, setIsProcessing] = useState(false);
     const getThemeGradient = () => {
         if (t.primary.includes('emerald')) return 'from-emerald-500 to-emerald-700';
         if (t.primary.includes('blue')) return 'from-blue-500 to-blue-700';
@@ -68,10 +68,26 @@ const Dues = ({ theme: t }) => {
         setViewMode('payment');
     };
 
-    const handleProcessPayment = async () => {
-        if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0 || isSubmitting) return;
+    const handleDeletePayment = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this payment? The balance will be reverted.")) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`/api/dues/history/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': token }
+            });
+            if (res.ok) {
+                await fetchData();
+            }
+        } catch (error) {
+            console.error("Delete failed:", error);
+        }
+    };
 
-        setIsSubmitting(true);
+    const handleProcessPayment = async () => {
+        if (!paymentAmount || isNaN(paymentAmount) || Number(paymentAmount) <= 0) return;
+        setIsProcessing(true);
+
         try {
             const token = localStorage.getItem('token');
             const res = await fetch('/api/dues/collect', {
@@ -96,7 +112,7 @@ const Dues = ({ theme: t }) => {
         } catch (error) {
             console.error("Payment failed:", error);
         } finally {
-            setIsSubmitting(false);
+            setIsProcessing(false);
         }
     };
 
@@ -281,7 +297,16 @@ const Dues = ({ theme: t }) => {
                                             <p className="text-[11px] font-bold text-slate-800">{txn.customer}</p>
                                             <p className="text-[9px] text-slate-400 mt-0.5">{txn.date} • <span className="uppercase font-bold text-slate-500">{txn.method}</span></p>
                                         </div>
-                                        <span className="text-xs font-black text-emerald-600 font-mono">+₹{txn.amount.toLocaleString()}</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs font-black text-emerald-600 font-mono">+₹{txn.amount.toLocaleString()}</span>
+                                            <button 
+                                                onClick={() => handleDeletePayment(txn.id)}
+                                                className="p-1.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Delete Payment"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
@@ -353,56 +378,42 @@ const Dues = ({ theme: t }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {['Cash', 'UPI', 'Cheque'].map(method => (
-                                                <button 
-                                                    key={method} 
-                                                    onClick={() => setPaymentMethod(method)}
-                                                    className={`py-2.5 rounded-xl border-2 text-[10px] font-bold transition-all ${
-                                                        paymentMethod === method 
-                                                        ? 'border-slate-900 bg-slate-900 text-white' 
-                                                        : 'border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    {method}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={paymentDate}
+                                        onChange={(e) => setPaymentDate(e.target.value)}
+                                        className="w-full px-4 py-3 bg-white border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:border-slate-300 transition-all shadow-sm"
+                                    />
+                                </div>
 
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Date</label>
-                                        <div className="relative group">
-                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-600 transition-colors" size={16} />
-                                            <input 
-                                                type="date"
-                                                value={paymentDate}
-                                                onChange={(e) => setPaymentDate(e.target.value)}
-                                                className="w-full pl-9 pr-3 py-[11px] bg-white border-2 border-slate-100 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-slate-300 transition-all shadow-sm"
-                                            />
-                                        </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['Cash', 'UPI', 'Cheque'].map(method => (
+                                            <button 
+                                                key={method} 
+                                                onClick={() => setPaymentMethod(method)}
+                                                className={`py-2.5 rounded-xl border-2 text-[10px] font-bold transition-all ${
+                                                    paymentMethod === method 
+                                                    ? 'border-slate-900 bg-slate-900 text-white' 
+                                                    : 'border-slate-100 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {method}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
 
                             <button 
                                 onClick={handleProcessPayment}
-                                disabled={isSubmitting}
-                                className={`w-full py-3.5 rounded-xl text-xs font-bold text-white shadow-lg transition-all uppercase tracking-widest flex items-center justify-center gap-2 ${
-                                    isSubmitting ? 'bg-slate-400 cursor-not-allowed shadow-none' : `hover:shadow-xl hover:-translate-y-0.5 ${t.primary}`
-                                }`}
+                                disabled={isProcessing}
+                                className={`w-full py-3.5 rounded-xl text-xs font-bold text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all uppercase tracking-widest ${t.primary} disabled:opacity-70 disabled:hover:translate-y-0 disabled:cursor-not-allowed`}
                             >
-                                {isSubmitting ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        Processing...
-                                    </>
-                                ) : (
-                                    'Confirm Payment'
-                                )}
+                                {isProcessing ? 'Processing...' : 'Confirm Payment'}
                             </button>
                         </div>
                     </div>

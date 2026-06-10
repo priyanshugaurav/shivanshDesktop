@@ -50,6 +50,7 @@ const ActionModal = ({ customer, onClose, onNavigate, theme }) => {
         "Customer ID": customer.id,
         "Name": customer.name,
         "Email": customer.email || 'N/A',
+        "Phone": customer.phone || 'N/A',
         "Address": customer.address,
         "Pincode": customer.pincode || 'N/A',
         "Created At": new Date(customer.createdAt).toLocaleDateString(),
@@ -57,27 +58,38 @@ const ActionModal = ({ customer, onClose, onNavigate, theme }) => {
         "Agreement Status": isAgreementDone ? 'Completed' : 'Pending',
         " ": "", // spacer
         "Challan No": challan?.details?.challanNo || 'N/A',
+        "Challan Date": challan?.details?.challanDate ? new Date(challan.details.challanDate).toLocaleDateString() : 'N/A',
         "Model": challan?.details?.model || 'N/A',
+        "Make": challan?.details?.make || 'N/A',
+        "Color": challan?.details?.color || 'N/A',
+        "Variant": challan?.details?.variant || 'N/A',
+        "Voltage": challan?.details?.voltage || 'N/A',
         "Chassis No": challan?.engine?.frameNo || 'N/A',
+        "Engine No": challan?.engine?.engineNo || 'N/A',
         "Motor No": challan?.engine?.motorNo || 'N/A',
+        "Battery No": challan?.registration?.batteryNo || 'N/A',
+        "Battery Company": challan?.registration?.batteryCompany || 'N/A',
+        "Charger No": challan?.registration?.chargerNo || 'N/A',
+        "Charger Company": challan?.registration?.chargerCompany || 'N/A',
+        "Key No": challan?.registration?.keyNo || 'N/A',
+        "Aadhar": challan?.ids?.aadhar || 'N/A',
+        "PAN": challan?.ids?.pan || 'N/A',
         "  ": "", // spacer
         "Agreement ID": agreement?.agreementId || 'N/A',
+        "Ex-Showroom": agreement?.model?.exShowroom || 'N/A',
+        "Insurance": agreement?.model?.insurance || 'N/A',
+        "RTO": agreement?.model?.rto || 'N/A',
         "Total On Road": agreement?.model?.onRoadPrice || 'N/A',
+        "Bank Name": agreement?.loan?.bankName || 'N/A',
+        "Loan Amount": agreement?.loan?.amount || 'N/A',
+        "Broker Name": agreement?.broker?.name || 'N/A',
         "Down Payment": agreement?.payment?.downPayment || 'N/A',
         "Paid Amount": agreement?.payment?.paidAmount || 'N/A',
+        "Payment Type": agreement?.payment?.type || 'N/A',
         "Dues": agreement?.payment?.dues || 'N/A',
         "Net Dues": agreement?.payment?.netDues || 'N/A',
+        "Final Net Profit": agreement?.dse?.finalNetProfit || 'N/A',
       }]);
-      
-      const colWidths = [
-        { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 40 }, 
-        { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 18 },
-        { wch: 5 }, // spacer
-        { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
-        { wch: 5 }, // spacer
-        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
-      ];
-      ws['!cols'] = colWidths;
       
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "CustomerData");
@@ -1636,6 +1648,7 @@ const Sales = ({ theme }) => {
             id: c.generatedId,
             name: `${c.personal.firstName} ${c.personal.lastName}`,
             email: c.personal.email,
+            phone: c.personal.mobile,
             address: `${c.address.village}, ${c.address.district}`,
             pincode: c.address.pincode,
             createdAt: c.createdAt,
@@ -1725,37 +1738,51 @@ const Sales = ({ theme }) => {
         return {
           "Customer ID": c.generatedId,
           "Name": c.personal ? `${c.personal.firstName} ${c.personal.lastName}` : 'N/A',
+          "Father Name": c.personal?.fatherName || 'N/A',
           "Email": c.personal?.email || 'N/A',
-          "Phone": c.personal?.phone || 'N/A',
+          "Phone": c.personal?.mobile || 'N/A',
           "Address": c.address ? `${c.address.village}, ${c.address.district}` : 'N/A',
+          "Police Station": c.address?.policeStation || 'N/A',
+          "Post Office": c.address?.postOffice || 'N/A',
           "Pincode": c.address?.pincode || 'N/A',
           "Created At": new Date(c.createdAt).toLocaleDateString(),
           " ": "", // spacer
           "Challan No": challan?.details?.challanNo || 'N/A',
+          "Challan Date": challan?.details?.challanDate ? new Date(challan.details.challanDate).toLocaleDateString() : 'N/A',
           "Model": challan?.details?.model || 'N/A',
+          "Make": challan?.details?.make || 'N/A',
+          "Color": challan?.details?.color || 'N/A',
+          "Variant": challan?.details?.variant || 'N/A',
+          "Voltage": challan?.details?.voltage || 'N/A',
           "Chassis No": challan?.engine?.frameNo || 'N/A',
+          "Engine No": challan?.engine?.engineNo || 'N/A',
           "Motor No": challan?.engine?.motorNo || 'N/A',
+          "Battery No": challan?.registration?.batteryNo || 'N/A',
+          "Battery Company": challan?.registration?.batteryCompany || 'N/A',
+          "Charger No": challan?.registration?.chargerNo || 'N/A',
+          "Charger Company": challan?.registration?.chargerCompany || 'N/A',
+          "Key No": challan?.registration?.keyNo || 'N/A',
+          "Aadhar": challan?.ids?.aadhar || 'N/A',
+          "PAN": challan?.ids?.pan || 'N/A',
           "  ": "", // spacer
           "Agreement ID": agreement?.agreementId || 'N/A',
+          "Ex-Showroom": agreement?.model?.exShowroom || 'N/A',
+          "Insurance": agreement?.model?.insurance || 'N/A',
+          "RTO": agreement?.model?.rto || 'N/A',
           "Total On Road": agreement?.model?.onRoadPrice || 'N/A',
+          "Bank Name": agreement?.loan?.bankName || 'N/A',
+          "Loan Amount": agreement?.loan?.amount || 'N/A',
+          "Broker Name": agreement?.broker?.name || 'N/A',
           "Down Payment": agreement?.payment?.downPayment || 'N/A',
           "Paid Amount": agreement?.payment?.paidAmount || 'N/A',
+          "Payment Type": agreement?.payment?.type || 'N/A',
           "Dues": agreement?.payment?.dues || 'N/A',
           "Net Dues": agreement?.payment?.netDues || 'N/A',
+          "Final Net Profit": agreement?.dse?.finalNetProfit || 'N/A',
         };
       });
 
       const ws = XLSX.utils.json_to_sheet(exportData);
-      
-      const colWidths = [
-        { wch: 15 }, { wch: 25 }, { wch: 30 }, { wch: 15 }, { wch: 40 }, 
-        { wch: 12 }, { wch: 15 }, 
-        { wch: 5 }, // spacer
-        { wch: 15 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
-        { wch: 5 }, // spacer
-        { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
-      ];
-      ws['!cols'] = colWidths;
       
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "All Customers");
