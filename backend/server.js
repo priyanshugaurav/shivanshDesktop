@@ -307,6 +307,28 @@ const VehicleStock = mongoose.models.VehicleStock || mongoose.model('VehicleStoc
 
 
 // ==========================================
+// SPARE STOCK SCHEMAS
+// ==========================================
+
+const SpareCategorySchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true, trim: true },
+  description: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SpareCategory = mongoose.models.SpareCategory || mongoose.model('SpareCategory', SpareCategorySchema);
+
+const SpareStockSchema = new mongoose.Schema({
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareCategory', required: true },
+  name: { type: String, required: true, trim: true },
+  amount: { type: Number, default: 0 },
+  qty: { type: Number, default: 0 },
+  purchaseRate: { type: Number, default: 0 },
+  status: { type: String, enum: ['Available', 'Out of Stock'], default: 'Available' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SpareStock = mongoose.models.SpareStock || mongoose.model('SpareStock', SpareStockSchema);
+
+// ==========================================
 //  MIDDLEWARE
 // ==========================================
 
@@ -1650,6 +1672,94 @@ app.delete('/api/ledger/:id', verifyToken, async (req, res) => {
   try {
     await Ledger.findByIdAndDelete(req.params.id);
     res.json({ message: 'Ledger entry deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// SPARE STOCK ROUTES
+// ==========================================
+
+// --- SPARE CATEGORIES ---
+app.get('/api/spare-categories', verifyToken, async (req, res) => {
+  try {
+    const categories = await SpareCategory.find().sort({ name: 1 }).lean();
+    const categoriesWithCount = await Promise.all(categories.map(async (cat) => {
+      const count = await SpareStock.countDocuments({ categoryId: cat._id, status: 'Available' });
+      return { ...cat, stockCount: count };
+    }));
+    res.json(categoriesWithCount);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/spare-categories', verifyToken, async (req, res) => {
+  try {
+    const category = new SpareCategory(req.body);
+    await category.save();
+    res.status(201).json(category);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/spare-categories/:id', verifyToken, async (req, res) => {
+  try {
+    const updated = await SpareCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spare-categories/:id', verifyToken, async (req, res) => {
+  try {
+    const stockCount = await SpareStock.countDocuments({ categoryId: req.params.id });
+    if (stockCount > 0) {
+      return res.status(400).json({ message: `Cannot delete category. ${stockCount} items still in stock.` });
+    }
+    await SpareCategory.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Category deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SPARE STOCKS ---
+app.get('/api/spare-stocks/:categoryId', verifyToken, async (req, res) => {
+  try {
+    const stocks = await SpareStock.find({ categoryId: req.params.categoryId }).sort({ createdAt: -1 });
+    res.json(stocks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/spare-stocks', verifyToken, async (req, res) => {
+  try {
+    const stock = new SpareStock(req.body);
+    await stock.save();
+    res.status(201).json(stock);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/spare-stocks/:id', verifyToken, async (req, res) => {
+  try {
+    const updated = await SpareStock.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spare-stocks/:id', verifyToken, async (req, res) => {
+  try {
+    await SpareStock.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Spare stock deleted' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
