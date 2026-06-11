@@ -337,6 +337,8 @@ const SpareBillSchema = new mongoose.Schema({
     sellingPrice: { type: Number, required: true }
   }],
   totalAmount: { type: Number, required: true },
+  labourCharge: { type: Number, default: 0 },
+  labourRemark: { type: String, trim: true, default: '' },
   paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque'], default: 'Cash' },
   createdAt: { type: Date, default: Date.now }
 });
@@ -1791,7 +1793,7 @@ app.get('/api/spare-bills', verifyToken, async (req, res) => {
 
 app.post('/api/spare-bills', verifyToken, async (req, res) => {
   try {
-    const { customerName, customerPhone, items, paymentMethod, totalAmount } = req.body;
+    const { customerName, customerPhone, items, paymentMethod, totalAmount, labourCharge, labourRemark } = req.body;
     
     // Create bill
     const bill = new SpareBill({
@@ -1799,7 +1801,9 @@ app.post('/api/spare-bills', verifyToken, async (req, res) => {
       customerPhone,
       items,
       paymentMethod,
-      totalAmount
+      totalAmount,
+      labourCharge: Number(labourCharge) || 0,
+      labourRemark
     });
     await bill.save();
 

@@ -4,7 +4,7 @@ import {
     Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers, Printer
 } from 'lucide-react';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
@@ -19,6 +19,8 @@ const SpareBilling = ({ theme: t }) => {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
+    const [labourCharge, setLabourCharge] = useState('');
+    const [labourRemark, setLabourRemark] = useState('');
     
     // Items for the new bill
     const [billItems, setBillItems] = useState([]);
@@ -151,7 +153,8 @@ const SpareBilling = ({ theme: t }) => {
         if (!customerName.trim()) return alert("Customer Name is required.");
         if (billItems.length === 0) return alert("Please add at least one item to the bill.");
 
-        const totalAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0);
+        const itemsTotal = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0);
+        const totalAmount = itemsTotal + (Number(labourCharge) || 0);
 
         setSubmitting(true);
         try {
@@ -160,7 +163,9 @@ const SpareBilling = ({ theme: t }) => {
                 customerPhone,
                 items: billItems,
                 paymentMethod,
-                totalAmount
+                totalAmount,
+                labourCharge: Number(labourCharge) || 0,
+                labourRemark
             };
 
             await axios.post(`${API_URL}/spare-bills`, payload, getAuthHeader());
@@ -169,6 +174,8 @@ const SpareBilling = ({ theme: t }) => {
             setCustomerName('');
             setCustomerPhone('');
             setPaymentMethod('Cash');
+            setLabourCharge('');
+            setLabourRemark('');
             setBillItems([]);
             setSelectedCategory('');
             
@@ -232,7 +239,16 @@ const SpareBilling = ({ theme: t }) => {
             ]);
         });
         
-        doc.autoTable({
+        if (bill.labourCharge > 0) {
+            tableRows.push([
+                `Labour Charge: ${bill.labourRemark || 'N/A'}`,
+                "-",
+                "-",
+                `Rs. ${bill.labourCharge.toLocaleString()}`
+            ]);
+        }
+        
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: 75,
@@ -269,7 +285,7 @@ const SpareBilling = ({ theme: t }) => {
         (bill.customerPhone && bill.customerPhone.includes(searchTerm))
     );
 
-    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0);
+    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0) + (Number(labourCharge) || 0);
 
     return (
         <div className="w-full min-h-screen bg-slate-50 p-6 flex flex-col font-sans text-slate-800">
@@ -356,6 +372,11 @@ const SpareBilling = ({ theme: t }) => {
                                                             {item.qty}x {item.name}
                                                         </span>
                                                     ))}
+                                                    {bill.labourCharge > 0 && (
+                                                        <span className="text-xs font-bold text-slate-500 mt-1">
+                                                            + Labour: ₹{bill.labourCharge} ({bill.labourRemark || 'No remark'})
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6">
@@ -541,8 +562,31 @@ const SpareBilling = ({ theme: t }) => {
                                 )}
                             </div>
 
-                            <div className="border-t border-slate-100 pt-5 space-y-4">
-                                <div className="flex justify-between items-center">
+                                <div className="border-t border-slate-100 pt-5 space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Labour Charge (₹)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0"
+                                            value={labourCharge}
+                                            onChange={(e) => setLabourCharge(e.target.value)}
+                                            className="w-full h-11 px-4 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Labour Remark</label>
+                                        <input 
+                                            type="text" 
+                                            value={labourRemark}
+                                            onChange={(e) => setLabourRemark(e.target.value)}
+                                            className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                                            placeholder="Optional"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center pt-2">
                                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Amount</span>
                                     <span className="text-2xl font-black text-emerald-600 font-mono tracking-tight">₹{totalBillAmount.toLocaleString()}</span>
                                 </div>
