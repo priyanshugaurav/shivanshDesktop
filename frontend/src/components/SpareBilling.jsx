@@ -218,10 +218,10 @@ const SpareBilling = ({ theme: t }) => {
         
         doc.setFontSize(26);
         doc.setTextColor(255, 255, 255);
-        doc.text("INVOICE", 140, 28);
+        doc.text("INVOICE", 145, 28); // Shifted text slightly right
         
         // Brand Name (Left)
-        doc.setFontSize(22);
+        doc.setFontSize(18); // Reduced to prevent overlap
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...darkText);
         doc.text("SHIVANSH AUTO ENTERPRISES", 14, 25);
@@ -292,7 +292,7 @@ const SpareBilling = ({ theme: t }) => {
             headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold' },
             bodyStyles: { textColor: darkText },
             alternateRowStyles: { fillColor: [250, 250, 250] },
-            styles: { fontSize: 10, cellPadding: 6 },
+            styles: { fontSize: 9, cellPadding: 5 }, // Reduced padding slightly to prevent wrap
             columnStyles: {
                 0: { cellWidth: 15, halign: 'center' },
                 1: { cellWidth: 'auto' },
@@ -310,21 +310,19 @@ const SpareBilling = ({ theme: t }) => {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text("Sub Total:", rightColX, finalY + 15);
-        doc.text("Tax:", rightColX, finalY + 22);
         
         doc.setFont('helvetica', 'normal');
         doc.text(`Rs. ${subTotal.toLocaleString()}`, 160, finalY + 15);
-        doc.text(`0.00`, 160, finalY + 22);
         
         // Yellow Total Box
         doc.setFillColor(...primaryColor);
-        doc.rect(rightColX - 5, finalY + 28, 75, 10, 'F');
+        doc.rect(rightColX - 5, finalY + 22, 85, 12, 'F');
         
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(255, 255, 255);
-        doc.text("Total:", rightColX, finalY + 35);
-        doc.text(`Rs. ${bill.totalAmount.toLocaleString()}`, 160, finalY + 35);
+        doc.text("Total:", rightColX, finalY + 30);
+        doc.text(`Rs. ${bill.totalAmount.toLocaleString()}`, 160, finalY + 30);
         
         // --- BOTTOM LEFT DETAILS ---
         doc.setTextColor(...darkText);
