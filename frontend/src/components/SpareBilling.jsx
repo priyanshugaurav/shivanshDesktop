@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-    Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers, Printer
+    Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers, Printer, Download, Filter
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
@@ -14,6 +15,11 @@ const SpareBilling = ({ theme: t }) => {
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    
+    // Filters
+    const [showFilters, setShowFilters] = useState(false);
+    const [filterFromDate, setFilterFromDate] = useState('');
+    const [filterToDate, setFilterToDate] = useState('');
 
     // New Bill State
     const [customerName, setCustomerName] = useState('');
@@ -353,10 +359,48 @@ const SpareBilling = ({ theme: t }) => {
     };
 
     // --- RENDER HELPERS ---
-    const filteredBills = bills.filter(bill => 
-        bill.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        (bill.customerPhone && bill.customerPhone.includes(searchTerm))
-    );
+    const filteredBills = bills.filter(bill => {
+        const matchSearch = bill.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            (bill.customerPhone && bill.customerPhone.includes(searchTerm));
+        
+        let matchDate = true;
+        if (filterFromDate || filterToDate) {
+            const billDate = new Date(bill.createdAt);
+            billDate.setHours(0, 0, 0, 0);
+            
+            if (filterFromDate) {
+                const from = new Date(filterFromDate);
+                from.setHours(0, 0, 0, 0);
+                if (billDate < from) matchDate = false;
+            }
+            if (filterToDate) {
+                const to = new Date(filterToDate);
+                to.setHours(23, 59, 59, 999);
+                if (billDate > to) matchDate = false;
+            }
+        }
+        return matchSearch && matchDate;
+    });
+
+    const handleExportExcel = () => {
+        if (filteredBills.length === 0) return alert("No bills to export.");
+        
+        const data = filteredBills.map(bill => ({
+            "Date": new Date(bill.createdAt).toLocaleDateString(),
+            "Customer Name": bill.customerName,
+            "Phone": bill.customerPhone || 'N/A',
+            "Items Billed": bill.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+            "Payment Method": bill.paymentMethod,
+            "Total Amount (Rs.)": bill.totalAmount,
+            "Labour Charge (Rs.)": bill.labourCharge || 0,
+            "Labour Remark": bill.labourRemark || ''
+        }));
+        
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Spare_Bills");
+        XLSX.writeFile(workbook, `Spare_Bills_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`);
+    };
 
     const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0) + (Number(labourCharge) || 0);
 
@@ -374,22 +418,36 @@ const SpareBilling = ({ theme: t }) => {
                 </div>
                 
                 {viewMode === 'dashboard' ? (
-                    <div className="flex gap-4">
+                    <div className="flex gap-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input 
                                 type="text" 
                                 placeholder="Search Customer..."
-                                className="h-10 pl-9 pr-4 rounded-xl bg-white border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-64 shadow-sm"
+                                className="h-10 pl-9 pr-4 rounded-xl bg-white border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 lg:w-64 shadow-sm"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                         <button 
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`h-10 px-4 rounded-xl text-sm font-bold uppercase tracking-widest transition-all flex items-center gap-2 border ${showFilters ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                            title="Filter by Date"
+                        >
+                            <Filter size={16} /> <span className="hidden lg:inline">Filter</span>
+                        </button>
+                        <button 
+                            onClick={handleExportExcel}
+                            className="h-10 px-4 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-emerald-100 transition-all flex items-center gap-2"
+                            title="Download Excel"
+                        >
+                            <Download size={16} /> <span className="hidden lg:inline">Export</span>
+                        </button>
+                        <button 
                             onClick={() => setViewMode('new_bill')}
                             className={`h-10 px-5 ${t.primary} text-white rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all flex items-center gap-2`}
                         >
-                            <Plus size={16} /> New Bill
+                            <Plus size={16} /> <span className="hidden lg:inline">New Bill</span>
                         </button>
                     </div>
                 ) : (
@@ -401,6 +459,36 @@ const SpareBilling = ({ theme: t }) => {
                     </button>
                 )}
             </div>
+
+            {/* Filters Row */}
+            {viewMode === 'dashboard' && showFilters && (
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex gap-4 items-end animate-in slide-in-from-top-2">
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">From Date</label>
+                        <input 
+                            type="date" 
+                            value={filterFromDate}
+                            onChange={(e) => setFilterFromDate(e.target.value)}
+                            className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">To Date</label>
+                        <input 
+                            type="date" 
+                            value={filterToDate}
+                            onChange={(e) => setFilterToDate(e.target.value)}
+                            className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
+                        />
+                    </div>
+                    <button 
+                        onClick={() => { setFilterFromDate(''); setFilterToDate(''); }}
+                        className="h-10 px-4 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider transition-colors"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+            )}
 
             {/* --- DASHBOARD VIEW --- */}
             {viewMode === 'dashboard' && (
