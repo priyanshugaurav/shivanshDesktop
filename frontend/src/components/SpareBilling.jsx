@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-    Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers
+    Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers, Printer
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
@@ -192,6 +194,75 @@ const SpareBilling = ({ theme: t }) => {
         }
     };
 
+    const handlePrintBill = (bill) => {
+        const doc = new jsPDF();
+        
+        // Header
+        doc.setFontSize(22);
+        doc.setTextColor(15, 23, 42); // slate-900
+        doc.text("SHIVANSH MOTORS", 14, 22);
+        
+        doc.setFontSize(11);
+        doc.setTextColor(100, 116, 139); // slate-500
+        doc.text("Spare Parts Invoice", 14, 30);
+        
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.line(14, 35, 196, 35);
+        
+        // Bill Details
+        doc.setFontSize(10);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Date: ${new Date(bill.createdAt).toLocaleDateString()}`, 14, 45);
+        doc.text(`Customer Name: ${bill.customerName}`, 14, 52);
+        if (bill.customerPhone) {
+            doc.text(`Phone Number: ${bill.customerPhone}`, 14, 59);
+        }
+        doc.text(`Payment Method: ${bill.paymentMethod}`, 14, 66);
+        
+        // Table
+        const tableColumn = ["Item Description", "Qty", "Price", "Total"];
+        const tableRows = [];
+        
+        bill.items.forEach(item => {
+            tableRows.push([
+                item.name,
+                item.qty.toString(),
+                `Rs. ${item.sellingPrice.toLocaleString()}`,
+                `Rs. ${(item.qty * item.sellingPrice).toLocaleString()}`
+            ]);
+        });
+        
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 75,
+            theme: 'grid',
+            headStyles: { fillColor: [16, 185, 129], textColor: 255 }, // Emerald-500
+            styles: { fontSize: 10, cellPadding: 5 },
+            columnStyles: {
+                0: { cellWidth: 'auto' },
+                1: { halign: 'center' },
+                2: { halign: 'right' },
+                3: { halign: 'right' }
+            }
+        });
+        
+        const finalY = doc.lastAutoTable.finalY || 75;
+        
+        // Footer Total
+        doc.setDrawColor(16, 185, 129); // Emerald-500
+        doc.setLineWidth(0.5);
+        doc.line(120, finalY + 10, 196, finalY + 10);
+        
+        doc.setFontSize(14);
+        doc.setTextColor(16, 185, 129); // Emerald-600
+        doc.text(`Grand Total: Rs. ${bill.totalAmount.toLocaleString()}`, 120, finalY + 18);
+        
+        // Save
+        const fileName = `Invoice_${bill.customerName.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
+        doc.save(fileName);
+    };
+
     // --- RENDER HELPERS ---
     const filteredBills = bills.filter(bill => 
         bill.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -300,13 +371,22 @@ const SpareBilling = ({ theme: t }) => {
                                                 <span className="text-sm font-mono font-black text-slate-800">₹ {bill.totalAmount.toLocaleString()}</span>
                                             </td>
                                             <td className="py-4 px-6 text-right">
-                                                <button 
-                                                    onClick={() => handleDeleteBill(bill._id)}
-                                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                    title="Delete Bill & Restore Stock"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => handlePrintBill(bill)}
+                                                        className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                                        title="Download PDF"
+                                                    >
+                                                        <Printer size={16} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDeleteBill(bill._id)}
+                                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Delete Bill & Restore Stock"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
