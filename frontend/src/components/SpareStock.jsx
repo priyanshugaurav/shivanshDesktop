@@ -471,8 +471,14 @@ const SpareStockDashboard = ({ theme: t }) => {
                                 ))}
                             </div>
                             <div className="ml-auto flex items-center gap-2">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Total Value (Cost):</span>
-                                <span className="text-sm font-black text-slate-700">₹ {totalStockValue.toLocaleString()}</span>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                                    {filterStatus === 'Sold Items' ? 'Total Sold Revenue:' : 'Total Value (Cost):'}
+                                </span>
+                                <span className="text-sm font-black text-slate-700">
+                                    ₹ {filterStatus === 'Sold Items' 
+                                        ? soldItems.reduce((sum, item) => sum + item.totalRevenue, 0).toLocaleString() 
+                                        : totalStockValue.toLocaleString()}
+                                </span>
                             </div>
                         </div>
 
