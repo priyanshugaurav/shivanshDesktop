@@ -1839,6 +1839,137 @@ app.delete('/api/spare-bills/:id', verifyToken, async (req, res) => {
   }
 });
 
+// --- SPARE ANALYTICS ---
+app.get('/api/spare-analytics', verifyToken, async (req, res) => {
+  try {
+    const bills = await SpareBill.find().sort({ createdAt: -1 });
+    const stocks = await SpareStock.find();
+    const categories = await SpareCategory.find();
+
+    // Total revenue from all bills
+    const totalRevenue = bills.reduce((sum, b) => sum + b.totalAmount, 0);
+    const totalLabourRevenue = bills.reduce((sum, b) => sum + (b.labourCharge || 0), 0);
+    
+    // Cost calculation: for each bill item, find the stock's purchaseRate
+    const stockMap = {};
+    stocks.forEach(s => { stockMap[s._id.toString()] = s; });
+    
+    let totalCost = 0;
+    let totalItemsSold = 0;
+    bills.forEach(b => {
+      b.items.forEach(item => {
+        const stock = stockMap[item.stockId?.toString()];
+        const purchaseRate = stock ? stock.purchaseRate : 0;
+        totalCost += purchaseRate * item.qty;
+        totalItemsSold += item.qty;
+      });
+    });
+
+    const totalProfit = totalRevenue - totalCost;
+
+    // Monthly revenue & profit (last 6 months)
+    const monthlyData = {};
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      monthlyData[key] = { name: key, revenue: 0, cost: 0, profit: 0, bills: 0 };
+    }
+    
+    bills.forEach(b => {
+      const d = new Date(b.createdAt);
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (monthlyData[key]) {
+        monthlyData[key].revenue += b.totalAmount;
+        monthlyData[key].bills += 1;
+        b.items.forEach(item => {
+          const stock = stockMap[item.stockId?.toString()];
+          const purchaseRate = stock ? stock.purchaseRate : 0;
+          monthlyData[key].cost += purchaseRate * item.qty;
+        });
+        monthlyData[key].profit = monthlyData[key].revenue - monthlyData[key].cost;
+      }
+    });
+
+    // Payment method distribution
+    const paymentDist = {};
+    bills.forEach(b => {
+      paymentDist[b.paymentMethod] = (paymentDist[b.paymentMethod] || 0) + 1;
+    });
+
+    // Top selling items
+    const itemSales = {};
+    bills.forEach(b => {
+      b.items.forEach(item => {
+        if (!itemSales[item.name]) {
+          itemSales[item.name] = { name: item.name, qtySold: 0, revenue: 0 };
+        }
+        itemSales[item.name].qtySold += item.qty;
+        itemSales[item.name].revenue += item.qty * item.sellingPrice;
+      });
+    });
+    const topItems = Object.values(itemSales).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+
+    // Category distribution
+    const categoryMap = {};
+    categories.forEach(c => { categoryMap[c._id.toString()] = c.name; });
+    const categoryDist = {};
+    stocks.forEach(s => {
+      const catName = categoryMap[s.categoryId?.toString()] || 'Uncategorized';
+      if (!categoryDist[catName]) categoryDist[catName] = { name: catName, value: 0, stockValue: 0 };
+      categoryDist[catName].value += s.qty;
+      categoryDist[catName].stockValue += s.qty * s.purchaseRate;
+    });
+
+    // Stock value (inventory worth)
+    const totalStockValue = stocks.reduce((sum, s) => sum + (s.qty * s.purchaseRate), 0);
+    const totalStockQty = stocks.reduce((sum, s) => sum + s.qty, 0);
+    const outOfStockCount = stocks.filter(s => s.qty === 0 || s.status === 'Out of Stock').length;
+
+    // Recent bills (last 10)
+    const recentBills = bills.slice(0, 10).map(b => ({
+      id: b._id.toString().slice(-6).toUpperCase(),
+      customer: b.customerName,
+      phone: b.customerPhone || '',
+      items: b.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+      total: b.totalAmount,
+      payment: b.paymentMethod,
+      date: new Date(b.createdAt).toLocaleDateString()
+    }));
+
+    // Top customers
+    const customerSpend = {};
+    bills.forEach(b => {
+      if (!customerSpend[b.customerName]) customerSpend[b.customerName] = { name: b.customerName, total: 0, count: 0 };
+      customerSpend[b.customerName].total += b.totalAmount;
+      customerSpend[b.customerName].count += 1;
+    });
+    const topCustomers = Object.values(customerSpend).sort((a, b) => b.total - a.total).slice(0, 5);
+
+    res.json({
+      kpis: {
+        totalRevenue,
+        totalCost,
+        totalProfit,
+        totalLabourRevenue,
+        totalBills: bills.length,
+        totalItemsSold,
+        totalStockValue,
+        totalStockQty,
+        outOfStockCount
+      },
+      monthlyData: Object.values(monthlyData),
+      paymentDistribution: Object.entries(paymentDist).map(([name, value]) => ({ name, value })),
+      topItems,
+      categoryDistribution: Object.values(categoryDist),
+      recentBills,
+      topCustomers
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Catch-all: serve index.html for all non-API routes (React Router support)
 // Fixed for Express 5: using app.use instead of app.get('*') to avoid PathError
 app.use((req, res) => {

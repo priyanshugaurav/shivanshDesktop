@@ -23,6 +23,7 @@ import Invoice from './Invoice';
 import Ledger from './Ledger';
 import SpareStock from './SpareStock';
 import SpareBilling from './SpareBilling';
+import SpareAnalytics from './SpareAnalytics';
 
 const Dashboard = () => {
     const { user, logout } = useAuth();
@@ -84,6 +85,7 @@ const Dashboard = () => {
             items: [
                 { id: 'spare_stock', label: 'Spare Stock', icon: Package },
                 { id: 'spare_billing', label: 'Spare Billing', icon: Receipt },
+                { id: 'spare_analytics', label: 'Spare Analytics', icon: BarChart2 },
                 { id: 'settings', label: 'Settings', icon: Settings },
                 // { id: 'support', label: 'Support', icon: LifeBuoy },
             ]
@@ -102,7 +104,7 @@ const Dashboard = () => {
 
     // --- CONTENT RENDERING HELPER ---
     const renderContent = () => {
-        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice', 'ledger', 'spare_stock', 'spare_billing'];
+        const validTabs = ['home', 'sales', 'enquiry', 'closed_enquiry', 'enquiry_stats', 'stock', 'analytics', 'employees', 'dues', 'add_vehicle', 'expenses', 'invoice', 'ledger', 'spare_stock', 'spare_billing', 'spare_analytics'];
         
         if (!validTabs.includes(activeTab)) {
              return (
@@ -135,6 +137,7 @@ const Dashboard = () => {
                 { visitedTabs.includes('invoice') && <div className={activeTab === 'invoice' ? 'block' : 'hidden'}><Invoice theme={t} /></div>}
                 { visitedTabs.includes('spare_stock') && <div className={activeTab === 'spare_stock' ? 'block' : 'hidden'}><SpareStock theme={t} /></div>}
                 { visitedTabs.includes('spare_billing') && <div className={activeTab === 'spare_billing' ? 'block' : 'hidden'}><SpareBilling theme={t} /></div>}
+                { visitedTabs.includes('spare_analytics') && <div className={activeTab === 'spare_analytics' ? 'block' : 'hidden'}><SpareAnalytics theme={t} /></div>}
             </>
         );
     };
