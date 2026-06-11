@@ -18,26 +18,32 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    try {
-      // 1. Call your real backend API
-      const res = await api.post('/api/auth/login', { email, password });
+    const maxRetries = 2;
+    let attempt = 0;
 
-      // 2. If successful, update context and redirect
-      // res.data contains { token, user } based on your backend code
-      login(res.data.user, res.data.token);
-      navigate('/dashboard');
-
-    } catch (err) {
-      // 3. Handle Errors
-      // If the backend sends an error message (like "Invalid credentials"), show it
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message);
-      } else {
-        setError('Failed to connect to the server. Is it running?');
+    while (attempt <= maxRetries) {
+      try {
+        const res = await api.post('/api/auth/login', { email, password });
+        login(res.data.user, res.data.token);
+        navigate('/dashboard');
+        return; // success, exit
+      } catch (err) {
+        if (err.response && err.response.data && err.response.data.message) {
+          // Backend returned a real error (wrong credentials etc.) — don't retry
+          setError(err.response.data.message);
+          setLoading(false);
+          return;
+        }
+        // Network/cold-start error — retry
+        attempt++;
+        if (attempt <= maxRetries) {
+          await new Promise(r => setTimeout(r, 2000)); // wait 2s before retry
+        } else {
+          setError('Server is waking up. Please try again in a few seconds.');
+        }
       }
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   return (
