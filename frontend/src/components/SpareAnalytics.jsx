@@ -16,7 +16,8 @@ const SpareAnalytics = ({ theme: t }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [period, setPeriod] = useState('all_time');
-    const [customMonth, setCustomMonth] = useState('');
+    const [customMonthVal, setCustomMonthVal] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
+    const [customYearVal, setCustomYearVal] = useState(new Date().getFullYear().toString());
 
     const getAuthHeader = () => {
         const token = localStorage.getItem('token');
@@ -48,8 +49,8 @@ const SpareAnalytics = ({ theme: t }) => {
             setLoading(true);
             try {
                 let url = `${API_URL}/spare-analytics?period=${period}`;
-                if (period === 'custom' && customMonth) {
-                    url += `&month=${customMonth}`;
+                if (period === 'custom') {
+                    url += `&month=${customYearVal}-${customMonthVal}`;
                 }
                 const res = await axios.get(url, getAuthHeader());
                 setData(res.data);
@@ -61,11 +62,8 @@ const SpareAnalytics = ({ theme: t }) => {
             }
         };
         
-        // If custom is selected but no month chosen yet, don't fetch or just fetch all
-        if (period === 'custom' && !customMonth) return;
-        
         fetchData();
-    }, [period, customMonth]);
+    }, [period, customMonthVal, customYearVal]);
 
     const formatCurrency = (val) => {
         if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
@@ -139,14 +137,31 @@ const SpareAnalytics = ({ theme: t }) => {
                         </select>
                     </div>
                     {period === 'custom' && (
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Select Month</label>
-                            <input 
-                                type="month" 
-                                value={customMonth}
-                                onChange={(e) => setCustomMonth(e.target.value)}
-                                className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:border-slate-400 shadow-sm"
-                            />
+                        <div className="flex gap-2">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Month</label>
+                                <select 
+                                    value={customMonthVal}
+                                    onChange={(e) => setCustomMonthVal(e.target.value)}
+                                    className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:border-slate-400 shadow-sm"
+                                >
+                                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => (
+                                        <option key={m} value={(i + 1).toString().padStart(2, '0')}>{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Year</label>
+                                <select 
+                                    value={customYearVal}
+                                    onChange={(e) => setCustomYearVal(e.target.value)}
+                                    className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:border-slate-400 shadow-sm"
+                                >
+                                    {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     )}
                 </div>
