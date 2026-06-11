@@ -15,6 +15,8 @@ const SpareAnalytics = ({ theme: t }) => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [period, setPeriod] = useState('all_time');
+    const [customMonth, setCustomMonth] = useState('');
 
     const getAuthHeader = () => {
         const token = localStorage.getItem('token');
@@ -45,7 +47,11 @@ const SpareAnalytics = ({ theme: t }) => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const res = await axios.get(`${API_URL}/spare-analytics`, getAuthHeader());
+                let url = `${API_URL}/spare-analytics?period=${period}`;
+                if (period === 'custom' && customMonth) {
+                    url += `&month=${customMonth}`;
+                }
+                const res = await axios.get(url, getAuthHeader());
                 setData(res.data);
             } catch (err) {
                 console.error(err);
@@ -54,8 +60,12 @@ const SpareAnalytics = ({ theme: t }) => {
                 setLoading(false);
             }
         };
+        
+        // If custom is selected but no month chosen yet, don't fetch or just fetch all
+        if (period === 'custom' && !customMonth) return;
+        
         fetchData();
-    }, []);
+    }, [period, customMonth]);
 
     const formatCurrency = (val) => {
         if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
@@ -113,6 +123,32 @@ const SpareAnalytics = ({ theme: t }) => {
                             <span>Last updated: Just now</span>
                         </div>
                     </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Time Period</label>
+                        <select 
+                            value={period} 
+                            onChange={(e) => setPeriod(e.target.value)}
+                            className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:border-slate-400 shadow-sm min-w-[140px]"
+                        >
+                            <option value="all_time">All Time</option>
+                            <option value="this_month">This Month</option>
+                            <option value="last_month">Last Month</option>
+                            <option value="custom">Custom Month</option>
+                        </select>
+                    </div>
+                    {period === 'custom' && (
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Select Month</label>
+                            <input 
+                                type="month" 
+                                value={customMonth}
+                                onChange={(e) => setCustomMonth(e.target.value)}
+                                className="bg-white border border-slate-200 text-slate-700 text-sm font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:border-slate-400 shadow-sm"
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 

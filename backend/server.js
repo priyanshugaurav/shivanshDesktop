@@ -1842,7 +1842,25 @@ app.delete('/api/spare-bills/:id', verifyToken, async (req, res) => {
 // --- SPARE ANALYTICS ---
 app.get('/api/spare-analytics', verifyToken, async (req, res) => {
   try {
-    const bills = await SpareBill.find().sort({ createdAt: -1 });
+    const { period, month } = req.query;
+    let billQuery = {};
+    const now = new Date();
+
+    if (period === 'this_month') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        billQuery.createdAt = { $gte: start };
+    } else if (period === 'last_month') {
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        billQuery.createdAt = { $gte: start, $lte: end };
+    } else if (period === 'custom' && month) {
+        const [year, m] = month.split('-');
+        const start = new Date(year, parseInt(m) - 1, 1);
+        const end = new Date(year, parseInt(m), 0, 23, 59, 59, 999);
+        billQuery.createdAt = { $gte: start, $lte: end };
+    }
+
+    const bills = await SpareBill.find(billQuery).sort({ createdAt: -1 });
     const stocks = await SpareStock.find();
     const categories = await SpareCategory.find();
 
