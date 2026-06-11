@@ -26,6 +26,9 @@ const SpareStockDashboard = ({ theme: t }) => {
 
     // Filter State
     const [filterStatus, setFilterStatus] = useState('All');
+    
+    // Sold Items State
+    const [soldItems, setSoldItems] = useState([]);
 
     // Add Stock Form State
     const initialStockForm = {
@@ -78,7 +81,47 @@ const SpareStockDashboard = ({ theme: t }) => {
     const handleSelectCategory = (cat) => {
         setSelectedCategory(cat);
         setViewMode('dashboard');
+        setFilterStatus('All');
         fetchStocks(cat._id);
+        fetchSoldItems(cat._id);
+    };
+
+    const fetchSoldItems = async (categoryId) => {
+        try {
+            const res = await axios.get(`${API_URL}/spare-bills`, getAuthHeader());
+            const bills = res.data;
+            const stocksRes = await axios.get(`${API_URL}/spare-stocks/${categoryId}`, getAuthHeader());
+            const categoryStockIds = stocksRes.data.map(s => s._id);
+            
+            // Aggregate sold items for this category
+            const soldMap = {};
+            bills.forEach(bill => {
+                bill.items.forEach(item => {
+                    if (categoryStockIds.includes(item.stockId)) {
+                        if (!soldMap[item.stockId]) {
+                            soldMap[item.stockId] = {
+                                stockId: item.stockId,
+                                name: item.name,
+                                totalQtySold: 0,
+                                totalRevenue: 0,
+                                transactions: []
+                            };
+                        }
+                        soldMap[item.stockId].totalQtySold += item.qty;
+                        soldMap[item.stockId].totalRevenue += item.qty * item.sellingPrice;
+                        soldMap[item.stockId].transactions.push({
+                            customer: bill.customerName,
+                            qty: item.qty,
+                            price: item.sellingPrice,
+                            date: bill.createdAt
+                        });
+                    }
+                });
+            });
+            setSoldItems(Object.values(soldMap));
+        } catch (err) {
+            console.error('Error fetching sold items', err);
+        }
     };
 
     const handleAddCategory = async () => {
@@ -413,12 +456,14 @@ const SpareStockDashboard = ({ theme: t }) => {
                         {/* Filters Bar */}
                         <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap gap-4 bg-slate-50/50">
                             <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-lg">
-                                {['All', 'Available', 'Out of Stock'].map(filter => (
+                                {['All', 'Available', 'Out of Stock', 'Sold Items'].map(filter => (
                                     <button
                                         key={filter}
                                         onClick={() => setFilterStatus(filter)}
                                         className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${
-                                            filterStatus === filter ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-50'
+                                            filterStatus === filter 
+                                                ? (filter === 'Sold Items' ? 'bg-violet-600 text-white' : 'bg-emerald-600 text-white') 
+                                                : 'text-slate-500 hover:bg-slate-50'
                                         }`}
                                     >
                                         {filter}
@@ -433,7 +478,55 @@ const SpareStockDashboard = ({ theme: t }) => {
 
                         {/* Stock Table */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            {filteredStocks.length === 0 ? (
+                            {filterStatus === 'Sold Items' ? (
+                                // --- SOLD ITEMS VIEW ---
+                                soldItems.length === 0 ? (
+                                    <div className="h-64 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
+                                        <Package size={32} className="mb-2 opacity-50"/>
+                                        <span className="text-xs font-bold uppercase">No Sold Items Found</span>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-slate-200">
+                                                <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Item Name</th>
+                                                <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Total Qty Sold</th>
+                                                <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Total Revenue</th>
+                                                <th className="py-3 px-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Recent Customers</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {soldItems.map((item, idx) => (
+                                                <tr key={idx} className="border-b border-slate-50 transition-colors group hover:bg-slate-50/80">
+                                                    <td className="py-3 px-4">
+                                                        <span className="font-bold text-sm text-slate-700">{item.name}</span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right">
+                                                        <span className="font-bold text-violet-600">{item.totalQtySold}</span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-right">
+                                                        <span className="font-mono text-xs font-bold text-emerald-600">₹ {item.totalRevenue.toLocaleString()}</span>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {item.transactions.slice(0, 3).map((t, i) => (
+                                                                <span key={i} className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                                                    {t.customer} ({t.qty}x)
+                                                                </span>
+                                                            ))}
+                                                            {item.transactions.length > 3 && (
+                                                                <span className="text-[9px] font-bold text-slate-400">+{item.transactions.length - 3} more</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )
+                            ) : (
+                            // --- REGULAR STOCK TABLE ---
+                            filteredStocks.length === 0 ? (
                                 <div className="h-64 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
                                     <Package size={32} className="mb-2 opacity-50"/>
                                     <span className="text-xs font-bold uppercase">No Spares Found</span>
@@ -499,7 +592,7 @@ const SpareStockDashboard = ({ theme: t }) => {
                                         ))}
                                     </tbody>
                                 </table>
-                            )}
+                            ))}
                         </div>
                     </div>
                 )}
