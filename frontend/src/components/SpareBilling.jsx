@@ -18,9 +18,9 @@ const SpareBilling = ({ theme: t }) => {
     // New Bill State
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [labourCharge, setLabourCharge] = useState('');
     const [labourRemark, setLabourRemark] = useState('');
+    const [isLabourChargeAdded, setIsLabourChargeAdded] = useState(false);
     
     // Items for the new bill
     const [billItems, setBillItems] = useState([]);
@@ -176,6 +176,7 @@ const SpareBilling = ({ theme: t }) => {
             setPaymentMethod('Cash');
             setLabourCharge('');
             setLabourRemark('');
+            setIsLabourChargeAdded(false);
             setBillItems([]);
             setSelectedCategory('');
             
@@ -204,44 +205,78 @@ const SpareBilling = ({ theme: t }) => {
     const handlePrintBill = (bill) => {
         const doc = new jsPDF();
         
-        // Header
+        // Colors
+        const primaryColor = [252, 193, 22]; // Yellow theme
+        const darkText = [30, 41, 59];
+        const lightText = [100, 116, 139];
+        
+        // --- HEADER ---
+        // Yellow rectangle top right
+        doc.setFillColor(...primaryColor);
+        doc.rect(130, 15, 80, 18, 'F');
+        
+        doc.setFontSize(26);
+        doc.setTextColor(255, 255, 255);
+        doc.text("INVOICE", 140, 28);
+        
+        // Brand Name (Left)
         doc.setFontSize(22);
-        doc.setTextColor(15, 23, 42); // slate-900
-        doc.text("SHIVANSH MOTORS", 14, 22);
-        
-        doc.setFontSize(11);
-        doc.setTextColor(100, 116, 139); // slate-500
-        doc.text("Spare Parts Invoice", 14, 30);
-        
-        doc.setDrawColor(226, 232, 240); // slate-200
-        doc.line(14, 35, 196, 35);
-        
-        // Bill Details
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...darkText);
+        doc.text("SHIVANSH AUTO ENTERPRISES", 14, 25);
         doc.setFontSize(10);
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Date: ${new Date(bill.createdAt).toLocaleDateString()}`, 14, 45);
-        doc.text(`Customer Name: ${bill.customerName}`, 14, 52);
-        if (bill.customerPhone) {
-            doc.text(`Phone Number: ${bill.customerPhone}`, 14, 59);
-        }
-        doc.text(`Payment Method: ${bill.paymentMethod}`, 14, 66);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...lightText);
+        doc.text("Authorised Spare Parts Dealer", 14, 31);
         
-        // Table
-        const tableColumn = ["Item Description", "Qty", "Price", "Total"];
+        // --- INVOICE INFO ---
+        // Left - Customer Info
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...darkText);
+        doc.text("Invoice to:", 14, 50);
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(bill.customerName, 14, 56);
+        if (bill.customerPhone) {
+            doc.text(`Phone: ${bill.customerPhone}`, 14, 61);
+        }
+        
+        // Right - Invoice Details
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Invoice#", 130, 50);
+        doc.text("Date", 130, 56);
+        
+        doc.setFont('helvetica', 'normal');
+        const shortId = bill._id.substring(bill._id.length - 6).toUpperCase();
+        doc.text(shortId, 160, 50);
+        doc.text(new Date(bill.createdAt).toLocaleDateString(), 160, 56);
+        
+        // --- TABLE ---
+        const tableColumn = ["SL.", "Item Description", "Price", "Qty.", "Total"];
         const tableRows = [];
         
-        bill.items.forEach(item => {
+        let subTotal = 0;
+        
+        bill.items.forEach((item, index) => {
+            const rowTotal = item.qty * item.sellingPrice;
+            subTotal += rowTotal;
             tableRows.push([
+                index + 1,
                 item.name,
-                item.qty.toString(),
                 `Rs. ${item.sellingPrice.toLocaleString()}`,
-                `Rs. ${(item.qty * item.sellingPrice).toLocaleString()}`
+                item.qty.toString(),
+                `Rs. ${rowTotal.toLocaleString()}`
             ]);
         });
         
         if (bill.labourCharge > 0) {
+            subTotal += bill.labourCharge;
             tableRows.push([
-                `Labour Charge: ${bill.labourRemark || 'N/A'}`,
+                bill.items.length + 1,
+                `Labour Charge: ${bill.labourRemark || ''}`,
                 "-",
                 "-",
                 `Rs. ${bill.labourCharge.toLocaleString()}`
@@ -251,28 +286,67 @@ const SpareBilling = ({ theme: t }) => {
         autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
-            startY: 75,
-            theme: 'grid',
-            headStyles: { fillColor: [16, 185, 129], textColor: 255 }, // Emerald-500
-            styles: { fontSize: 10, cellPadding: 5 },
+            startY: 70,
+            theme: 'plain',
+            headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold' },
+            bodyStyles: { textColor: darkText },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            styles: { fontSize: 10, cellPadding: 6 },
             columnStyles: {
-                0: { cellWidth: 'auto' },
-                1: { halign: 'center' },
-                2: { halign: 'right' },
-                3: { halign: 'right' }
+                0: { cellWidth: 15, halign: 'center' },
+                1: { cellWidth: 'auto' },
+                2: { cellWidth: 35, halign: 'right' },
+                3: { cellWidth: 20, halign: 'center' },
+                4: { cellWidth: 35, halign: 'right' }
             }
         });
         
-        const finalY = doc.lastAutoTable.finalY || 75;
+        const finalY = doc.lastAutoTable.finalY || 70;
         
-        // Footer Total
-        doc.setDrawColor(16, 185, 129); // Emerald-500
-        doc.setLineWidth(0.5);
-        doc.line(120, finalY + 10, 196, finalY + 10);
+        // --- BOTTOM TOTALS ---
+        const rightColX = 130;
         
-        doc.setFontSize(14);
-        doc.setTextColor(16, 185, 129); // Emerald-600
-        doc.text(`Grand Total: Rs. ${bill.totalAmount.toLocaleString()}`, 120, finalY + 18);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text("Sub Total:", rightColX, finalY + 15);
+        doc.text("Tax:", rightColX, finalY + 22);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Rs. ${subTotal.toLocaleString()}`, 160, finalY + 15);
+        doc.text(`0.00`, 160, finalY + 22);
+        
+        // Yellow Total Box
+        doc.setFillColor(...primaryColor);
+        doc.rect(rightColX - 5, finalY + 28, 75, 10, 'F');
+        
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255);
+        doc.text("Total:", rightColX, finalY + 35);
+        doc.text(`Rs. ${bill.totalAmount.toLocaleString()}`, 160, finalY + 35);
+        
+        // --- BOTTOM LEFT DETAILS ---
+        doc.setTextColor(...darkText);
+        doc.setFontSize(10);
+        doc.text("Thank you for your business!", 14, finalY + 15);
+        
+        doc.setFontSize(9);
+        doc.text("Payment Info:", 14, finalY + 28);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Method: ${bill.paymentMethod}`, 14, finalY + 34);
+        
+        // --- FOOTER ---
+        const pageHeight = doc.internal.pageSize.getHeight();
+        
+        // Yellow line
+        doc.setDrawColor(...primaryColor);
+        doc.setLineWidth(1);
+        doc.line(14, pageHeight - 30, 196, pageHeight - 30);
+        
+        doc.setFontSize(9);
+        doc.setTextColor(...lightText);
+        doc.text("Authorised Sign", 160, pageHeight - 20);
+        doc.text("Shivansh Auto Enterprises | Thank you", 14, pageHeight - 20);
         
         // Save
         const fileName = `Invoice_${bill.customerName.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
@@ -563,29 +637,52 @@ const SpareBilling = ({ theme: t }) => {
                             </div>
 
                                 <div className="border-t border-slate-100 pt-5 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Labour Charge (₹)</label>
-                                        <input 
-                                            type="number" 
-                                            min="0"
-                                            value={labourCharge}
-                                            onChange={(e) => setLabourCharge(e.target.value)}
-                                            className="w-full h-11 px-4 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
-                                            placeholder="0"
-                                        />
+                                {isLabourChargeAdded ? (
+                                    <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
+                                        <button 
+                                            onClick={() => {
+                                                setIsLabourChargeAdded(false);
+                                                setLabourCharge('');
+                                                setLabourRemark('');
+                                            }}
+                                            className="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors"
+                                            title="Remove Labour Charge"
+                                        >
+                                            <X size={16}/>
+                                        </button>
+                                        <h4 className="text-[10px] font-black uppercase text-slate-600 tracking-wider">Labour Details</h4>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Amount (₹)</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={labourCharge}
+                                                    onChange={(e) => setLabourCharge(e.target.value)}
+                                                    className="w-full h-10 px-3 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white transition-all"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Remark</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={labourRemark}
+                                                    onChange={(e) => setLabourRemark(e.target.value)}
+                                                    className="w-full h-10 px-3 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white transition-all"
+                                                    placeholder="Optional"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Labour Remark</label>
-                                        <input 
-                                            type="text" 
-                                            value={labourRemark}
-                                            onChange={(e) => setLabourRemark(e.target.value)}
-                                            className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
-                                            placeholder="Optional"
-                                        />
-                                    </div>
-                                </div>
+                                ) : (
+                                    <button 
+                                        onClick={() => setIsLabourChargeAdded(true)}
+                                        className="w-full py-3 border-2 border-dashed border-slate-200 text-slate-500 rounded-xl font-bold uppercase text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex justify-center items-center gap-2"
+                                    >
+                                        <Plus size={14}/> Add Labour Charge
+                                    </button>
+                                )}
                                 <div className="flex justify-between items-center pt-2">
                                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Amount</span>
                                     <span className="text-2xl font-black text-emerald-600 font-mono tracking-tight">₹{totalBillAmount.toLocaleString()}</span>
