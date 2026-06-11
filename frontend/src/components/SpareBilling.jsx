@@ -25,9 +25,12 @@ const SpareBilling = ({ theme: t }) => {
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
     const [paymentMethod, setPaymentMethod] = useState('Cash');
-    const [labourCharge, setLabourCharge] = useState('');
+    const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
+    
+    // Labour for new bill
+    const [labourList, setLabourList] = useState([]);
+    const [labourAmount, setLabourAmount] = useState('');
     const [labourRemark, setLabourRemark] = useState('');
-    const [isLabourChargeAdded, setIsLabourChargeAdded] = useState(false);
     
     // Items for the new bill
     const [billItems, setBillItems] = useState([]);
@@ -161,7 +164,8 @@ const SpareBilling = ({ theme: t }) => {
         if (billItems.length === 0) return alert("Please add at least one item to the bill.");
 
         const itemsTotal = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0);
-        const totalAmount = itemsTotal + (Number(labourCharge) || 0);
+        const labourTotal = labourList.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+        const totalAmount = itemsTotal + labourTotal;
 
         setSubmitting(true);
         try {
@@ -171,8 +175,8 @@ const SpareBilling = ({ theme: t }) => {
                 items: billItems,
                 paymentMethod,
                 totalAmount,
-                labourCharge: Number(labourCharge) || 0,
-                labourRemark
+                labourList,
+                createdAt: billDate
             };
 
             await axios.post(`${API_URL}/spare-bills`, payload, getAuthHeader());
@@ -180,10 +184,11 @@ const SpareBilling = ({ theme: t }) => {
             // Reset form
             setCustomerName('');
             setCustomerPhone('');
-            setPaymentMethod('Cash');
-            setLabourCharge('');
+            setBillItems([]);
+            setLabourList([]);
+            setLabourAmount('');
             setLabourRemark('');
-            setIsLabourChargeAdded(false);
+            setBillDate(new Date().toISOString().split('T')[0]);
             setBillItems([]);
             setSelectedCategory('');
             
@@ -279,15 +284,29 @@ const SpareBilling = ({ theme: t }) => {
             ]);
         });
         
+        let labourIndex = bill.items.length + 1;
         if (bill.labourCharge > 0) {
             subTotal += bill.labourCharge;
             tableRows.push([
-                bill.items.length + 1,
+                labourIndex++,
                 `Labour Charge: ${bill.labourRemark || ''}`,
                 "-",
                 "-",
                 `Rs. ${bill.labourCharge.toLocaleString()}`
             ]);
+        }
+        
+        if (bill.labourList && bill.labourList.length > 0) {
+            bill.labourList.forEach(l => {
+                subTotal += l.amount;
+                tableRows.push([
+                    labourIndex++,
+                    `Labour: ${l.remark}`,
+                    "-",
+                    "-",
+                    `Rs. ${l.amount.toLocaleString()}`
+                ]);
+            });
         }
         
         autoTable(doc, {
@@ -385,16 +404,20 @@ const SpareBilling = ({ theme: t }) => {
     const handleExportExcel = () => {
         if (filteredBills.length === 0) return alert("No bills to export.");
         
-        const data = filteredBills.map(bill => ({
-            "Date": new Date(bill.createdAt).toLocaleDateString(),
-            "Customer Name": bill.customerName,
-            "Phone": bill.customerPhone || 'N/A',
-            "Items Billed": bill.items.map(i => `${i.qty}x ${i.name}`).join(', '),
-            "Payment Method": bill.paymentMethod,
-            "Total Amount (Rs.)": bill.totalAmount,
-            "Labour Charge (Rs.)": bill.labourCharge || 0,
-            "Labour Remark": bill.labourRemark || ''
-        }));
+        const data = filteredBills.map(bill => {
+            const listLabourSum = (bill.labourList || []).reduce((s, l) => s + l.amount, 0);
+            const listLabourRemark = (bill.labourList || []).map(l => `${l.remark} (${l.amount})`).join(', ');
+            return {
+                "Date": new Date(bill.createdAt).toLocaleDateString(),
+                "Customer Name": bill.customerName,
+                "Phone": bill.customerPhone || 'N/A',
+                "Items Billed": bill.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+                "Payment Method": bill.paymentMethod,
+                "Total Amount (Rs.)": bill.totalAmount,
+                "Labour Charge (Rs.)": (bill.labourCharge || 0) + listLabourSum,
+                "Labour Remark": [bill.labourRemark, listLabourRemark].filter(Boolean).join(' | ')
+            };
+        });
         
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
@@ -402,7 +425,7 @@ const SpareBilling = ({ theme: t }) => {
         XLSX.writeFile(workbook, `Spare_Bills_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`);
     };
 
-    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0) + (Number(labourCharge) || 0);
+    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0) + labourList.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
 
     return (
         <div className="w-full min-h-screen bg-slate-50 p-6 flex flex-col font-sans text-slate-800">
@@ -538,6 +561,11 @@ const SpareBilling = ({ theme: t }) => {
                                                             + Labour: ₹{bill.labourCharge} ({bill.labourRemark || 'No remark'})
                                                         </span>
                                                     )}
+                                                    {bill.labourList && bill.labourList.map((l, i) => (
+                                                        <span key={`l-${i}`} className="text-xs font-bold text-slate-500 mt-1">
+                                                            + Labour: ₹{l.amount} ({l.remark})
+                                                        </span>
+                                                    ))}
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6">
@@ -609,6 +637,15 @@ const SpareBilling = ({ theme: t }) => {
                                         onChange={(e) => setCustomerPhone(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
                                         placeholder="Optional"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Bill Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={billDate}
+                                        onChange={(e) => setBillDate(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
                                     />
                                 </div>
                             </div>
@@ -685,6 +722,52 @@ const SpareBilling = ({ theme: t }) => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Add Labour Card */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-visible">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2">
+                                <Plus size={16}/> Add Labour to Bill
+                            </h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Amount (₹)</label>
+                                    <input 
+                                        type="number" 
+                                        min="0"
+                                        value={labourAmount}
+                                        onChange={(e) => setLabourAmount(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                                        placeholder="e.g. 500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Remark</label>
+                                    <input 
+                                        type="text" 
+                                        value={labourRemark}
+                                        onChange={(e) => setLabourRemark(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                                        placeholder="e.g. Engine Oil Change"
+                                    />
+                                </div>
+                                <div>
+                                    <button 
+                                        onClick={() => {
+                                            if (!labourAmount || isNaN(labourAmount) || labourAmount <= 0) return alert("Please enter a valid amount");
+                                            if (!labourRemark.trim()) return alert("Please enter a remark");
+                                            setLabourList([...labourList, { amount: Number(labourAmount), remark: labourRemark }]);
+                                            setLabourAmount('');
+                                            setLabourRemark('');
+                                        }}
+                                        disabled={!labourAmount || !labourRemark.trim()}
+                                        className="w-full h-11 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                                    >
+                                        <Plus size={14}/> Add Labour
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Right Column: Bill Summary & Checkout */}
@@ -695,82 +778,60 @@ const SpareBilling = ({ theme: t }) => {
                             </h3>
 
                             <div className="min-h-[150px] max-h-[300px] overflow-y-auto pr-2 mb-6 space-y-3">
-                                {billItems.length === 0 ? (
+                                {billItems.length === 0 && labourList.length === 0 ? (
                                     <div className="h-full flex items-center justify-center text-slate-400 text-xs font-bold uppercase py-8 border-2 border-dashed border-slate-100 rounded-xl">
                                         No items added
                                     </div>
                                 ) : (
-                                    billItems.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between items-start p-3 bg-slate-50 rounded-xl border border-slate-100 group">
-                                            <div className="flex-1">
-                                                <h4 className="text-sm font-bold text-slate-800 leading-tight">{item.name}</h4>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">
-                                                    {item.qty} x ₹{item.sellingPrice}
-                                                </p>
+                                    <>
+                                        {billItems.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-start p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+                                                <div className="flex-1">
+                                                    <h4 className="text-sm font-bold text-slate-800 leading-tight">{item.name}</h4>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">
+                                                        {item.qty} x ₹{item.sellingPrice}
+                                                    </p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2 ml-3">
+                                                    <span className="text-sm font-mono font-black text-slate-800">
+                                                        ₹{(item.qty * item.sellingPrice).toLocaleString()}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => handleRemoveItemFromBill(idx)}
+                                                        className="text-slate-300 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <X size={14}/>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2 ml-3">
-                                                <span className="text-sm font-mono font-black text-slate-800">
-                                                    ₹{(item.qty * item.sellingPrice).toLocaleString()}
-                                                </span>
-                                                <button 
-                                                    onClick={() => handleRemoveItemFromBill(idx)}
-                                                    className="text-slate-300 hover:text-red-500 transition-colors"
-                                                >
-                                                    <X size={14}/>
-                                                </button>
+                                        ))}
+                                        {labourList.map((labour, idx) => (
+                                            <div key={`labour-${idx}`} className="flex justify-between items-start p-3 bg-blue-50 rounded-xl border border-blue-100 group">
+                                                <div className="flex-1">
+                                                    <h4 className="text-sm font-bold text-blue-800 leading-tight">Labour: {labour.remark}</h4>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2 ml-3">
+                                                    <span className="text-sm font-mono font-black text-blue-800">
+                                                        ₹{(labour.amount).toLocaleString()}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const newList = [...labourList];
+                                                            newList.splice(idx, 1);
+                                                            setLabourList(newList);
+                                                        }}
+                                                        className="text-blue-300 hover:text-red-500 transition-colors"
+                                                    >
+                                                        <X size={14}/>
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        ))}
+                                    </>
                                 )}
                             </div>
 
                                 <div className="border-t border-slate-100 pt-5 space-y-4">
-                                {isLabourChargeAdded ? (
-                                    <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100 relative">
-                                        <button 
-                                            onClick={() => {
-                                                setIsLabourChargeAdded(false);
-                                                setLabourCharge('');
-                                                setLabourRemark('');
-                                            }}
-                                            className="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors"
-                                            title="Remove Labour Charge"
-                                        >
-                                            <X size={16}/>
-                                        </button>
-                                        <h4 className="text-[10px] font-black uppercase text-slate-600 tracking-wider">Labour Details</h4>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Amount (₹)</label>
-                                                <input 
-                                                    type="number" 
-                                                    min="0"
-                                                    value={labourCharge}
-                                                    onChange={(e) => setLabourCharge(e.target.value)}
-                                                    className="w-full h-10 px-3 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white transition-all"
-                                                    placeholder="0"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Remark</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={labourRemark}
-                                                    onChange={(e) => setLabourRemark(e.target.value)}
-                                                    className="w-full h-10 px-3 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white transition-all"
-                                                    placeholder="Optional"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <button 
-                                        onClick={() => setIsLabourChargeAdded(true)}
-                                        className="w-full py-3 border-2 border-dashed border-slate-200 text-slate-500 rounded-xl font-bold uppercase text-xs hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all flex justify-center items-center gap-2"
-                                    >
-                                        <Plus size={14}/> Add Labour Charge
-                                    </button>
-                                )}
                                 <div className="flex justify-between items-center pt-2">
                                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Amount</span>
                                     <span className="text-2xl font-black text-emerald-600 font-mono tracking-tight">₹{totalBillAmount.toLocaleString()}</span>

@@ -339,6 +339,10 @@ const SpareBillSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   labourCharge: { type: Number, default: 0 },
   labourRemark: { type: String, trim: true, default: '' },
+  labourList: [{
+    amount: { type: Number, required: true },
+    remark: { type: String, required: true }
+  }],
   paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Bank Transfer'], default: 'Cash' },
   createdAt: { type: Date, default: Date.now }
 });
@@ -1793,17 +1797,22 @@ app.get('/api/spare-bills', verifyToken, async (req, res) => {
 
 app.post('/api/spare-bills', verifyToken, async (req, res) => {
   try {
-    const { customerName, customerPhone, items, paymentMethod, totalAmount, labourCharge, labourRemark } = req.body;
-    
-    // Create bill
+    const { customerName, customerPhone, items, paymentMethod, totalAmount, labourCharge, labourRemark, labourList, createdAt } = req.body;
+
+    if (!customerName || !items || items.length === 0 || !totalAmount) {
+      return res.status(400).json({ error: 'Missing required bill fields' });
+    }
+
     const bill = new SpareBill({
       customerName,
       customerPhone,
       items,
-      paymentMethod,
       totalAmount,
       labourCharge: Number(labourCharge) || 0,
-      labourRemark
+      labourRemark: labourRemark || '',
+      labourList: labourList || [],
+      paymentMethod: paymentMethod || 'Cash',
+      createdAt: createdAt ? new Date(createdAt) : Date.now()
     });
     await bill.save();
 
@@ -1866,7 +1875,11 @@ app.get('/api/spare-analytics', verifyToken, async (req, res) => {
 
     // Total revenue from all bills
     const totalRevenue = bills.reduce((sum, b) => sum + b.totalAmount, 0);
-    const totalLabourRevenue = bills.reduce((sum, b) => sum + (b.labourCharge || 0), 0);
+    const totalLabourRevenue = bills.reduce((sum, b) => {
+        const legacyLabour = b.labourCharge || 0;
+        const listLabour = (b.labourList || []).reduce((s, l) => s + (l.amount || 0), 0);
+        return sum + legacyLabour + listLabour;
+    }, 0);
     
     // Cost calculation: for each bill item, find the stock's purchaseRate
     const stockMap = {};
