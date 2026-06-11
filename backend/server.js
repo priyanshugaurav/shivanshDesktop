@@ -184,7 +184,7 @@ const CollectionSchema = new mongoose.Schema({
   agreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', required: true },
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   amount: { type: Number, required: true },
-  method: { type: String, enum: ['Cash', 'UPI', 'Cheque'], default: 'Cash' },
+  method: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Bank Transfer'], default: 'Cash' },
   date: { type: Date, default: Date.now },
   ledgerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ledger' }
 });
@@ -339,7 +339,7 @@ const SpareBillSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   labourCharge: { type: Number, default: 0 },
   labourRemark: { type: String, trim: true, default: '' },
-  paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque'], default: 'Cash' },
+  paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Bank Transfer'], default: 'Cash' },
   createdAt: { type: Date, default: Date.now }
 });
 const SpareBill = mongoose.models.SpareBill || mongoose.model('SpareBill', SpareBillSchema);

@@ -544,7 +544,8 @@ const SpareBilling = ({ theme: t }) => {
                                                 <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
                                                     bill.paymentMethod === 'Cash' ? 'bg-emerald-100 text-emerald-700' :
                                                     bill.paymentMethod === 'UPI' ? 'bg-blue-100 text-blue-700' :
-                                                    'bg-purple-100 text-purple-700'
+                                                    bill.paymentMethod === 'Bank Transfer' ? 'bg-purple-100 text-purple-700' :
+                                                    'bg-slate-100 text-slate-700'
                                                 }`}>
                                                     {bill.paymentMethod}
                                                 </span>
@@ -785,6 +786,7 @@ const SpareBilling = ({ theme: t }) => {
                                         <option value="Cash">Cash</option>
                                         <option value="UPI">UPI</option>
                                         <option value="Cheque">Cheque</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
                                     </select>
                                 </div>
 

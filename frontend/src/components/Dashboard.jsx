@@ -81,11 +81,16 @@ const Dashboard = () => {
             ]
         },
         {
-            title: "System",
+            title: "Spares",
             items: [
                 { id: 'spare_stock', label: 'Spare Stock', icon: Package },
                 { id: 'spare_billing', label: 'Spare Billing', icon: Receipt },
                 { id: 'spare_analytics', label: 'Spare Analytics', icon: BarChart2 },
+            ]
+        },
+        {
+            title: "System",
+            items: [
                 { id: 'settings', label: 'Settings', icon: Settings },
                 // { id: 'support', label: 'Support', icon: LifeBuoy },
             ]

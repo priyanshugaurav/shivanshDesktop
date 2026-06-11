@@ -391,7 +391,7 @@ const Dues = ({ theme: t }) => {
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">Payment Mode</label>
                                     <div className="grid grid-cols-3 gap-2">
-                                        {['Cash', 'UPI', 'Cheque'].map(method => (
+                                        {['Cash', 'UPI', 'Cheque', 'Bank Transfer'].map(method => (
                                             <button 
                                                 key={method} 
                                                 onClick={() => setPaymentMethod(method)}
