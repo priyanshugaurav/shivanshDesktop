@@ -18,6 +18,7 @@ const SpareBilling = ({ theme: t }) => {
     // New Bill State
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [labourCharge, setLabourCharge] = useState('');
     const [labourRemark, setLabourRemark] = useState('');
     const [isLabourChargeAdded, setIsLabourChargeAdded] = useState(false);
