@@ -1887,7 +1887,6 @@ app.get('/api/spare-analytics', verifyToken, async (req, res) => {
 
     // Monthly revenue & profit (last 6 months)
     const monthlyData = {};
-    const now = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
