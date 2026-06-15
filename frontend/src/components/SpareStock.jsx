@@ -25,7 +25,7 @@ const SpareStockDashboard = ({ theme: t }) => {
     const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
     // Filter State
-    const [filterStatus, setFilterStatus] = useState('All');
+    const [filterStatus, setFilterStatus] = useState('Available');
     
     // Sold Items State
     const [soldItems, setSoldItems] = useState([]);
@@ -81,7 +81,7 @@ const SpareStockDashboard = ({ theme: t }) => {
     const handleSelectCategory = (cat) => {
         setSelectedCategory(cat);
         setViewMode('dashboard');
-        setFilterStatus('All');
+        setFilterStatus('Available');
         fetchStocks(cat._id);
         fetchSoldItems(cat._id);
     };
@@ -230,7 +230,19 @@ const SpareStockDashboard = ({ theme: t }) => {
     // --- FILTERING LOGIC ---
     const filteredStocks = stocks.filter(stock => {
         const matchesSearch = stock.name.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = filterStatus === 'All' || stock.status === filterStatus;
+        const effectiveStatus = stock.qty === 0 ? 'Out of Stock' : stock.status;
+        
+        let matchesStatus = false;
+        if (filterStatus === 'Available') {
+            matchesStatus = effectiveStatus === 'Available';
+        } else if (filterStatus === 'Out of Stock') {
+            matchesStatus = effectiveStatus === 'Out of Stock';
+        } else if (filterStatus === 'To Order') {
+            matchesStatus = stock.qty < 5;
+        } else if (filterStatus === 'All') {
+            matchesStatus = true;
+        }
+
         return matchesSearch && matchesStatus;
     });
 
@@ -456,13 +468,13 @@ const SpareStockDashboard = ({ theme: t }) => {
                         {/* Filters Bar */}
                         <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap gap-4 bg-slate-50/50">
                             <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-lg">
-                                {['All', 'Available', 'Out of Stock', 'Sold Items'].map(filter => (
+                                {['Available', 'Out of Stock', 'To Order', 'Sold Items'].map(filter => (
                                     <button
                                         key={filter}
                                         onClick={() => setFilterStatus(filter)}
                                         className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${
                                             filterStatus === filter 
-                                                ? (filter === 'Sold Items' ? 'bg-violet-600 text-white' : 'bg-emerald-600 text-white') 
+                                                ? (filter === 'Sold Items' ? 'bg-violet-600 text-white' : filter === 'To Order' ? 'bg-amber-500 text-white' : 'bg-emerald-600 text-white') 
                                                 : 'text-slate-500 hover:bg-slate-50'
                                         }`}
                                     >
@@ -553,7 +565,7 @@ const SpareStockDashboard = ({ theme: t }) => {
                                         {filteredStocks.map((item) => (
                                             <tr key={item._id} className="border-b border-slate-50 transition-colors group hover:bg-slate-50/80">
                                                 <td className="py-3 px-4">
-                                                    <span className={`inline-block w-2 h-2 rounded-full ${item.status === 'Available' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                                                    <span className={`inline-block w-2 h-2 rounded-full ${(item.qty === 0 ? 'Out of Stock' : item.status) === 'Available' ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <span className="font-bold text-sm text-slate-700">{item.name}</span>
