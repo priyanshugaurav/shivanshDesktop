@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-    Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers, Printer, Download, Filter
-} from 'lucide-react';
+import { Plus, Search, Receipt, X, Trash2, CheckCircle2, User, Phone, IndianRupee, Layers, Printer, Download, Filter, Eye } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -24,6 +22,8 @@ const SpareBilling = ({ theme: t }) => {
     // New Bill State
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
+    const [customerVillage, setCustomerVillage] = useState('');
+    const [viewPdfDataUrl, setViewPdfDataUrl] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
     
@@ -182,6 +182,7 @@ const SpareBilling = ({ theme: t }) => {
             const payload = {
                 customerName,
                 customerPhone,
+                customerVillage,
                 items: billItems,
                 paymentMethod,
                 totalAmount,
@@ -196,6 +197,7 @@ const SpareBilling = ({ theme: t }) => {
             // Reset form
             setCustomerName('');
             setCustomerPhone('');
+            setCustomerVillage('');
             setBillItems([]);
             setLabourList([]);
             setLabourAmount('');
@@ -230,7 +232,7 @@ const SpareBilling = ({ theme: t }) => {
         }
     };
 
-    const handlePrintBill = (bill) => {
+    const generatePdf = (bill) => {
         const doc = new jsPDF();
         
         // Colors
@@ -267,8 +269,13 @@ const SpareBilling = ({ theme: t }) => {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(bill.customerName, 14, 56);
+        let yOffset = 61;
         if (bill.customerPhone) {
-            doc.text(`Phone: ${bill.customerPhone}`, 14, 61);
+            doc.text(`Phone: ${bill.customerPhone}`, 14, yOffset);
+            yOffset += 5;
+        }
+        if (bill.customerVillage) {
+            doc.text(`Village: ${bill.customerVillage}`, 14, yOffset);
         }
         
         // Right - Invoice Details
@@ -402,8 +409,18 @@ const SpareBilling = ({ theme: t }) => {
         doc.text("Shivansh Auto Enterprises | Thank you", 14, pageHeight - 20);
         
         // Save
+        return doc;
+    };
+
+    const handlePrintBill = (bill) => {
+        const doc = generatePdf(bill);
         const fileName = `Invoice_${bill.customerName.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`;
         doc.save(fileName);
+    };
+
+    const handleViewBill = (bill) => {
+        const doc = generatePdf(bill);
+        setViewPdfDataUrl(doc.output('datauristring'));
     };
 
     // --- RENDER HELPERS ---
@@ -559,6 +576,7 @@ const SpareBilling = ({ theme: t }) => {
                                         <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Date</th>
                                         <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Customer</th>
                                         <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Items Billed</th>
+                                        <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Qty</th>
                                         <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400">Payment</th>
                                         <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Total Amount</th>
                                         <th className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">Actions</th>
@@ -582,7 +600,7 @@ const SpareBilling = ({ theme: t }) => {
                                                 <div className="flex flex-col gap-0.5">
                                                     {bill.items.map((item, idx) => (
                                                         <span key={idx} className="text-xs font-semibold text-slate-600">
-                                                            {item.qty}x {item.name}
+                                                            {item.name}
                                                         </span>
                                                     ))}
                                                     {bill.labourCharge > 0 && (
@@ -594,6 +612,21 @@ const SpareBilling = ({ theme: t }) => {
                                                         <span key={`l-${i}`} className="text-xs font-bold text-slate-500 mt-1">
                                                             + Labour: ₹{l.amount} ({l.remark})
                                                         </span>
+                                                    ))}
+                                                </div>
+                                            </td>
+                                            <td className="py-4 px-6 text-center">
+                                                <div className="flex flex-col gap-0.5 items-center">
+                                                    {bill.items.map((item, idx) => (
+                                                        <span key={idx} className="text-xs font-bold text-slate-600 bg-slate-100 px-2 rounded-md">
+                                                            {item.qty}
+                                                        </span>
+                                                    ))}
+                                                    {bill.labourCharge > 0 && (
+                                                        <span className="text-xs font-bold text-slate-400 mt-1">-</span>
+                                                    )}
+                                                    {bill.labourList && bill.labourList.map((l, i) => (
+                                                        <span key={`l-qty-${i}`} className="text-xs font-bold text-slate-400 mt-1">-</span>
                                                     ))}
                                                 </div>
                                             </td>
@@ -612,6 +645,13 @@ const SpareBilling = ({ theme: t }) => {
                                             </td>
                                             <td className="py-4 px-6 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => handleViewBill(bill)}
+                                                        className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                                        title="View PDF"
+                                                    >
+                                                        <Eye size={16} />
+                                                    </button>
                                                     <button 
                                                         onClick={() => handlePrintBill(bill)}
                                                         className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
@@ -647,7 +687,7 @@ const SpareBilling = ({ theme: t }) => {
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2">
                                 <User size={16}/> Customer Information
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Customer Name *</label>
                                     <input 
@@ -664,6 +704,16 @@ const SpareBilling = ({ theme: t }) => {
                                         type="text" 
                                         value={customerPhone}
                                         onChange={(e) => setCustomerPhone(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                                        placeholder="Optional"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Village</label>
+                                    <input 
+                                        type="text" 
+                                        value={customerVillage}
+                                        onChange={(e) => setCustomerVillage(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
                                         placeholder="Optional"
                                     />
@@ -927,6 +977,21 @@ const SpareBilling = ({ theme: t }) => {
                                     {submitting ? 'Processing...' : <><CheckCircle2 size={18}/> Generate Bill</>}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        {viewPdfDataUrl && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95">
+                        <div className="flex justify-between items-center p-4 border-b border-slate-100">
+                            <h3 className="text-lg font-black uppercase tracking-tight text-slate-800">Bill Preview</h3>
+                            <button onClick={() => setViewPdfDataUrl(null)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                                <X size={20}/>
+                            </button>
+                        </div>
+                        <div className="flex-1 p-0 rounded-b-2xl overflow-hidden">
+                            <iframe src={viewPdfDataUrl} className="w-full h-full border-none" title="PDF Preview"></iframe>
                         </div>
                     </div>
                 </div>

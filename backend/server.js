@@ -330,6 +330,7 @@ const SpareStock = mongoose.models.SpareStock || mongoose.model('SpareStock', Sp
 const SpareBillSchema = new mongoose.Schema({
   customerName: { type: String, required: true, trim: true },
   customerPhone: { type: String, trim: true },
+  customerVillage: { type: String, trim: true, default: '' },
   items: [{
     stockId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareStock', required: true },
     name: { type: String, required: true },
