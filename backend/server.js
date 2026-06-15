@@ -334,15 +334,19 @@ const SpareBillSchema = new mongoose.Schema({
     stockId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareStock', required: true },
     name: { type: String, required: true },
     qty: { type: Number, required: true },
-    sellingPrice: { type: Number, required: true }
+    sellingPrice: { type: Number, required: true },
+    discount: { type: Number, default: 0 }
   }],
   totalAmount: { type: Number, required: true },
   labourCharge: { type: Number, default: 0 },
   labourRemark: { type: String, trim: true, default: '' },
   labourList: [{
     amount: { type: Number, required: true },
-    remark: { type: String, required: true }
+    remark: { type: String, required: true },
+    discount: { type: Number, default: 0 }
   }],
+  isFreeService: { type: Boolean, default: false },
+  serviceNumber: { type: String, default: '' },
   paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Bank Transfer'], default: 'Cash' },
   createdAt: { type: Date, default: Date.now }
 });

@@ -47,6 +47,11 @@ const SpareBilling = ({ theme: t }) => {
 
     const [submitting, setSubmitting] = useState(false);
 
+    const [isFreeService, setIsFreeService] = useState(false);
+    const [serviceNumber, setServiceNumber] = useState('');
+    const [selectedSpareDiscount, setSelectedSpareDiscount] = useState('');
+    const [labourDiscount, setLabourDiscount] = useState('');
+
     // --- HELPER: GET HEADERS ---
     const getAuthHeader = () => {
         const token = localStorage.getItem('token');
@@ -132,7 +137,7 @@ const SpareBilling = ({ theme: t }) => {
         }
 
         // Check if already in bill
-        const existingItemIndex = billItems.findIndex(item => item.stockId === spare._id);
+        const existingItemIndex = billItems.findIndex(item => item.stockId === spare._id && (item.discount || 0) === (Number(selectedSpareDiscount) || 0));
         if (existingItemIndex >= 0) {
             const updatedItems = [...billItems];
             updatedItems[existingItemIndex].qty += Number(selectedSpareQty);
@@ -144,13 +149,15 @@ const SpareBilling = ({ theme: t }) => {
                     stockId: spare._id,
                     name: spare.name,
                     qty: Number(selectedSpareQty),
-                    sellingPrice: Number(selectedSparePrice)
+                    sellingPrice: Number(selectedSparePrice),
+                    discount: Number(selectedSpareDiscount) || 0
                 }
             ]);
         }
 
         // Reset selection inputs
         setSelectedSpareQty(1);
+        setSelectedSpareDiscount('');
     };
 
     const handleRemoveItemFromBill = (index) => {
@@ -163,8 +170,11 @@ const SpareBilling = ({ theme: t }) => {
         if (!customerName.trim()) return alert("Customer Name is required.");
         if (billItems.length === 0) return alert("Please add at least one item to the bill.");
 
-        const itemsTotal = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0);
-        const labourTotal = labourList.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+        const itemsTotal = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice * (1 - (item.discount || 0)/100)), 0);
+        let labourTotal = 0;
+        if (!(isFreeService && serviceNumber)) {
+            labourTotal = labourList.reduce((sum, l) => sum + ((Number(l.amount) || 0) * (1 - (l.discount || 0)/100)), 0);
+        }
         const totalAmount = itemsTotal + labourTotal;
 
         setSubmitting(true);
@@ -176,6 +186,8 @@ const SpareBilling = ({ theme: t }) => {
                 paymentMethod,
                 totalAmount,
                 labourList,
+                isFreeService,
+                serviceNumber,
                 createdAt: billDate
             };
 
@@ -188,9 +200,13 @@ const SpareBilling = ({ theme: t }) => {
             setLabourList([]);
             setLabourAmount('');
             setLabourRemark('');
+            setLabourDiscount('');
+            setIsFreeService(false);
+            setServiceNumber('');
             setBillDate(new Date().toISOString().split('T')[0]);
             setBillItems([]);
             setSelectedCategory('');
+            setSelectedSpareDiscount('');
             
             // Return to dashboard and refresh
             setViewMode('dashboard');
@@ -273,11 +289,15 @@ const SpareBilling = ({ theme: t }) => {
         let subTotal = 0;
         
         bill.items.forEach((item, index) => {
-            const rowTotal = item.qty * item.sellingPrice;
+            const itemDiscount = item.discount || 0;
+            const discountedPrice = item.sellingPrice * (1 - itemDiscount / 100);
+            const rowTotal = item.qty * discountedPrice;
             subTotal += rowTotal;
+            let description = item.name;
+            if (itemDiscount > 0) description += ` (${itemDiscount}% Off)`;
             tableRows.push([
                 index + 1,
-                item.name,
+                description,
                 `Rs. ${item.sellingPrice.toLocaleString()}`,
                 item.qty.toString(),
                 `Rs. ${rowTotal.toLocaleString()}`
@@ -285,26 +305,35 @@ const SpareBilling = ({ theme: t }) => {
         });
         
         let labourIndex = bill.items.length + 1;
+        const freeServiceMode = bill.isFreeService && bill.serviceNumber;
         if (bill.labourCharge > 0) {
-            subTotal += bill.labourCharge;
+            const rowTotal = freeServiceMode ? 0 : bill.labourCharge;
+            subTotal += rowTotal;
+            let desc = `Labour Charge: ${bill.labourRemark || ''}`;
+            if (freeServiceMode) desc += ` (Free Service ${bill.serviceNumber})`;
             tableRows.push([
                 labourIndex++,
-                `Labour Charge: ${bill.labourRemark || ''}`,
+                desc,
                 "-",
                 "-",
-                `Rs. ${bill.labourCharge.toLocaleString()}`
+                `Rs. ${rowTotal.toLocaleString()}`
             ]);
         }
-        
         if (bill.labourList && bill.labourList.length > 0) {
             bill.labourList.forEach(l => {
-                subTotal += l.amount;
+                const lDisc = l.discount || 0;
+                let rowTotal = l.amount * (1 - lDisc / 100);
+                if (freeServiceMode) rowTotal = 0;
+                subTotal += rowTotal;
+                let desc = `Labour: ${l.remark}`;
+                if (freeServiceMode) desc += ` (Free Service ${bill.serviceNumber})`;
+                else if (lDisc > 0) desc += ` (${lDisc}% Off)`;
                 tableRows.push([
                     labourIndex++,
-                    `Labour: ${l.remark}`,
+                    desc,
                     "-",
                     "-",
-                    `Rs. ${l.amount.toLocaleString()}`
+                    `Rs. ${rowTotal.toLocaleString()}`
                 ]);
             });
         }
@@ -425,7 +454,7 @@ const SpareBilling = ({ theme: t }) => {
         XLSX.writeFile(workbook, `Spare_Bills_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`);
     };
 
-    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice), 0) + labourList.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice * (1 - (item.discount || 0)/100)), 0) + ((isFreeService && serviceNumber) ? 0 : labourList.reduce((sum, l) => sum + ((Number(l.amount) || 0) * (1 - (l.discount || 0)/100)), 0));
 
     return (
         <div className="w-full min-h-screen bg-slate-50 p-6 flex flex-col font-sans text-slate-800">
@@ -648,6 +677,22 @@ const SpareBilling = ({ theme: t }) => {
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
                                     />
                                 </div>
+                                <div className="col-span-1 md:col-span-2 flex flex-col sm:flex-row gap-4 mt-2">
+                                    <label className="flex items-center gap-2 text-sm font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200 cursor-pointer">
+                                        <input type="checkbox" checked={isFreeService} onChange={(e) => setIsFreeService(e.target.checked)} className="w-4 h-4 accent-blue-600" />
+                                        Free Service
+                                    </label>
+                                    {isFreeService && (
+                                        <select 
+                                            value={serviceNumber} 
+                                            onChange={(e) => setServiceNumber(e.target.value)}
+                                            className="h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 outline-none bg-white flex-1"
+                                        >
+                                            <option value="">-- Select Service No. --</option>
+                                            {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Service {n}</option>)}
+                                        </select>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -688,7 +733,7 @@ const SpareBilling = ({ theme: t }) => {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Quantity</label>
                                         <input 
@@ -711,6 +756,17 @@ const SpareBilling = ({ theme: t }) => {
                                         />
                                     </div>
                                     <div>
+                                        <label className="text-[10px] font-bold text-emerald-600 uppercase block mb-1.5">Discount (%)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0" max="100"
+                                            value={selectedSpareDiscount}
+                                            onChange={(e) => setSelectedSpareDiscount(e.target.value)}
+                                            className="w-full h-11 px-4 rounded-xl border-2 border-emerald-100 font-mono font-bold text-emerald-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-emerald-50 focus:bg-white transition-all"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div>
                                         <button 
                                             onClick={handleAddItemToBill}
                                             disabled={!selectedSpareId}
@@ -729,7 +785,7 @@ const SpareBilling = ({ theme: t }) => {
                                 <Plus size={16}/> Add Labour to Bill
                             </h3>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Amount (₹)</label>
                                     <input 
@@ -752,13 +808,25 @@ const SpareBilling = ({ theme: t }) => {
                                     />
                                 </div>
                                 <div>
+                                    <label className="text-[10px] font-bold text-emerald-600 uppercase block mb-1.5">Discount (%)</label>
+                                    <input 
+                                        type="number" 
+                                        min="0" max="100"
+                                        value={labourDiscount}
+                                        onChange={(e) => setLabourDiscount(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-xl border-2 border-emerald-100 font-mono font-bold text-emerald-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none bg-emerald-50 focus:bg-white transition-all"
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div>
                                     <button 
                                         onClick={() => {
                                             if (!labourAmount || isNaN(labourAmount) || labourAmount <= 0) return alert("Please enter a valid amount");
                                             if (!labourRemark.trim()) return alert("Please enter a remark");
-                                            setLabourList([...labourList, { amount: Number(labourAmount), remark: labourRemark }]);
+                                            setLabourList([...labourList, { amount: Number(labourAmount), remark: labourRemark, discount: Number(labourDiscount) || 0 }]);
                                             setLabourAmount('');
                                             setLabourRemark('');
+                                            setLabourDiscount('');
                                         }}
                                         disabled={!labourAmount || !labourRemark.trim()}
                                         className="w-full h-11 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
@@ -787,14 +855,14 @@ const SpareBilling = ({ theme: t }) => {
                                         {billItems.map((item, idx) => (
                                             <div key={idx} className="flex justify-between items-start p-3 bg-slate-50 rounded-xl border border-slate-100 group">
                                                 <div className="flex-1">
-                                                    <h4 className="text-sm font-bold text-slate-800 leading-tight">{item.name}</h4>
+                                                    <h4 className="text-sm font-bold text-slate-800 leading-tight">{item.name} {item.discount > 0 && <span className="text-[10px] text-emerald-600 ml-1">(-{item.discount}%)</span>}</h4>
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase mt-1">
                                                         {item.qty} x ₹{item.sellingPrice}
                                                     </p>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 ml-3">
                                                     <span className="text-sm font-mono font-black text-slate-800">
-                                                        ₹{(item.qty * item.sellingPrice).toLocaleString()}
+                                                        ₹{((item.qty * item.sellingPrice) * (1 - (item.discount || 0)/100)).toLocaleString()}
                                                     </span>
                                                     <button 
                                                         onClick={() => handleRemoveItemFromBill(idx)}
@@ -808,11 +876,11 @@ const SpareBilling = ({ theme: t }) => {
                                         {labourList.map((labour, idx) => (
                                             <div key={`labour-${idx}`} className="flex justify-between items-start p-3 bg-blue-50 rounded-xl border border-blue-100 group">
                                                 <div className="flex-1">
-                                                    <h4 className="text-sm font-bold text-blue-800 leading-tight">Labour: {labour.remark}</h4>
+                                                    <h4 className="text-sm font-bold text-blue-800 leading-tight">Labour: {labour.remark} {labour.discount > 0 && <span className="text-[10px] text-emerald-600 ml-1">(-{labour.discount}%)</span>}</h4>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 ml-3">
-                                                    <span className="text-sm font-mono font-black text-blue-800">
-                                                        ₹{(labour.amount).toLocaleString()}
+                                                    <span className={`text-sm font-mono font-black ${(isFreeService && serviceNumber) ? 'text-emerald-500 line-through' : 'text-blue-800'}`}>
+                                                        ₹{(labour.amount * (1 - (labour.discount || 0)/100)).toLocaleString()}
                                                     </span>
                                                     <button 
                                                         onClick={() => {
