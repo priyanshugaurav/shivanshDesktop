@@ -18,6 +18,7 @@ const SpareAnalytics = ({ theme: t }) => {
     const [period, setPeriod] = useState('all_time');
     const [customMonthVal, setCustomMonthVal] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
     const [customYearVal, setCustomYearVal] = useState(new Date().getFullYear().toString());
+    const [topItemsSort, setTopItemsSort] = useState('revenue');
 
     const getAuthHeader = () => {
         const token = localStorage.getItem('token');
@@ -66,9 +67,7 @@ const SpareAnalytics = ({ theme: t }) => {
     }, [period, customMonthVal, customYearVal]);
 
     const formatCurrency = (val) => {
-        if (val >= 100000) return `₹${(val / 100000).toFixed(1)}L`;
-        if (val >= 1000) return `₹${(val / 1000).toFixed(1)}K`;
-        return `₹${val.toLocaleString()}`;
+        return `₹${val.toLocaleString('en-IN')}`;
     };
 
     if (loading) {
@@ -249,7 +248,7 @@ const SpareAnalytics = ({ theme: t }) => {
                                     axisLine={false}
                                     tickLine={false}
                                     tick={{ fill: '#94a3b8', fontSize: 10 }}
-                                    tickFormatter={(val) => val >= 100000 ? `${(val/100000).toFixed(1)}L` : val >= 1000 ? `${(val/1000).toFixed(0)}k` : val}
+                                    tickFormatter={(val) => val.toLocaleString('en-IN')}
                                 />
                                 <Tooltip
                                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px' }}
@@ -347,10 +346,17 @@ const SpareAnalytics = ({ theme: t }) => {
                         <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2">
                             <TrendingUp size={12} className="text-emerald-500" /> Top Selling Items
                         </h3>
-                        <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded-lg">By Revenue</span>
+                        <select 
+                            value={topItemsSort}
+                            onChange={(e) => setTopItemsSort(e.target.value)}
+                            className="text-[9px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-lg outline-none border-none cursor-pointer"
+                        >
+                            <option value="revenue">By Revenue</option>
+                            <option value="quantity">By Quantity</option>
+                        </select>
                     </div>
                     <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                        {topItems.length > 0 ? topItems.map((item, idx) => (
+                        {topItems.length > 0 ? [...topItems].sort((a, b) => topItemsSort === 'revenue' ? b.revenue - a.revenue : b.qtySold - a.qtySold).map((item, idx) => (
                             <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/30 hover:bg-white hover:shadow-md transition-all group cursor-pointer">
                                 <div className="flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-600 shadow-sm group-hover:scale-110 transition-transform">
@@ -453,7 +459,52 @@ const SpareAnalytics = ({ theme: t }) => {
                 </div>
             </div>
 
+            
+            {/* --- EXTRA ROW: Top Items Pie Chart --- */}
+            <div className="bg-white p-5 rounded-[1.5rem] border border-slate-200/60 shadow-sm flex flex-col h-[360px] mb-5">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                        <Package size={12} className="text-violet-500" /> Top 10 Items by Quantity
+                    </h3>
+                </div>
+                <div className="flex-1 w-full relative flex flex-col md:flex-row items-center">
+                    <div className="w-full md:w-1/2 h-full min-h-[200px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie 
+                                    data={[...topItems].sort((a,b)=>b.qtySold-a.qtySold).slice(0, 10)} 
+                                    innerRadius={60} 
+                                    outerRadius={90} 
+                                    paddingAngle={2} 
+                                    dataKey="qtySold" 
+                                    nameKey="name" 
+                                    stroke="none"
+                                >
+                                    {[...topItems].sort((a,b)=>b.qtySold-a.qtySold).slice(0, 10).map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b', '#0ea5e9', '#d946ef', '#14b8a6', '#84cc16'][index % 10]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    contentStyle={{ borderRadius: '8px', fontSize: '10px', border: 'none' }}
+                                    formatter={(val) => [`${val} Units`, 'Quantity Sold']}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                    <div className="w-full md:w-1/2 h-full overflow-y-auto pr-2 space-y-2 mt-4 md:mt-0">
+                        {[...topItems].sort((a,b)=>b.qtySold-a.qtySold).slice(0, 10).map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#f43f5e', '#64748b', '#0ea5e9', '#d946ef', '#14b8a6', '#84cc16'][idx % 10] }}></span>
+                                <span className="text-[10px] font-bold text-slate-700 truncate">{item.name}</span>
+                                <span className="ml-auto text-[10px] font-black text-slate-900 bg-slate-50 px-2 py-0.5 rounded-md">{item.qtySold} units</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
             {/* --- PROFIT SUMMARY FOOTER --- */}
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-3 bg-gradient-to-r from-slate-900 to-slate-800 rounded-[1.5rem] p-5 text-white flex items-center justify-between shadow-xl shadow-slate-200/50 relative overflow-hidden">
                     <div className="absolute left-0 top-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
