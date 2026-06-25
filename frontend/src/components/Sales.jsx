@@ -182,23 +182,59 @@ const ActionModal = ({ customer, onClose, onNavigate, theme }) => {
                 </button>
 
                 {/* BUTTON: AGREEMENT */}
-                <button 
-                    onClick={() => !isAgreementLocked && onNavigate(isAgreementDone ? 'view-agreement' : 'agreement')} 
-                    disabled={isAgreementLocked} 
-                    className={`w-full group text-left relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ease-out flex items-start gap-5 p-5 ${isAgreementLocked ? 'bg-slate-50/50 border-slate-100 opacity-60 cursor-not-allowed grayscale-[0.8]' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/40 hover:border-violet-400 hover:shadow-violet-100 hover:-translate-y-1'}`}
-                >
-                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm ${isAgreementLocked ? 'bg-slate-100 text-slate-300' : isAgreementDone ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400 group-hover:bg-violet-50 group-hover:text-violet-600'}`}>
-                        {isAgreementLocked ? <Lock className="h-5 w-5" /> : isAgreementDone ? <Check className="h-6 w-6" /> : <ScrollText className="h-6 w-6" />}
+                {!isAgreementLocked && !isAgreementDone ? (
+                    <div className="w-full relative overflow-hidden rounded-2xl border-2 bg-white border-slate-100 shadow-xl shadow-slate-200/40 flex flex-row transition-all duration-300 hover:border-violet-400 hover:shadow-violet-100">
+                        {/* BAJAJ HALF */}
+                        <button 
+                            onClick={() => onNavigate('agreement-bajaj')}
+                            className="flex-1 p-5 border-r border-slate-100 hover:bg-violet-50 group flex flex-col items-start gap-3 transition-colors text-left"
+                        >
+                            <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-violet-100 group-hover:text-violet-600 flex items-center justify-center transition-colors">
+                                <ScrollText className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-center mb-1 w-full">
+                                    <h4 className="text-sm font-bold text-slate-800 group-hover:text-violet-700 transition-colors">Rental Agreement (Bajaj)</h4>
+                                </div>
+                                <p className="text-[10px] font-medium text-slate-500 leading-relaxed">Generate contract for Bajaj vehicles.</p>
+                            </div>
+                        </button>
+
+                        {/* EV HALF */}
+                        <button 
+                            onClick={() => onNavigate('agreement-ev')}
+                            className="flex-1 p-5 hover:bg-violet-50 group flex flex-col items-start gap-3 transition-colors text-left"
+                        >
+                            <div className="h-10 w-10 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-violet-100 group-hover:text-violet-600 flex items-center justify-center transition-colors">
+                                <Zap className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <div className="flex justify-between items-center mb-1 w-full">
+                                    <h4 className="text-sm font-bold text-slate-800 group-hover:text-violet-700 transition-colors">Rental Agreement (EV)</h4>
+                                </div>
+                                <p className="text-[10px] font-medium text-slate-500 leading-relaxed">Generate contract for Electric vehicles.</p>
+                            </div>
+                        </button>
                     </div>
-                    <div className="flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                            <h4 className={`text-sm font-bold ${isAgreementLocked ? 'text-slate-400' : 'text-slate-800'}`}>{isAgreementDone ? 'View Agreement' : 'Rental Agreement'}</h4>
-                            {isAgreementLocked && <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded"><Lock className="h-3 w-3" /> LOCKED</span>}
-                            {!isAgreementLocked && isAgreementDone && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100"><CheckCircle2 className="h-3 w-3" /> COMPLETED</span>}
+                ) : (
+                    <button 
+                        onClick={() => !isAgreementLocked && onNavigate(isAgreementDone ? 'view-agreement' : 'agreement')} 
+                        disabled={isAgreementLocked} 
+                        className={`w-full group text-left relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ease-out flex items-start gap-5 p-5 ${isAgreementLocked ? 'bg-slate-50/50 border-slate-100 opacity-60 cursor-not-allowed grayscale-[0.8]' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/40 hover:border-violet-400 hover:shadow-violet-100 hover:-translate-y-1'}`}
+                    >
+                        <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm ${isAgreementLocked ? 'bg-slate-100 text-slate-300' : isAgreementDone ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 text-slate-400 group-hover:bg-violet-50 group-hover:text-violet-600'}`}>
+                            {isAgreementLocked ? <Lock className="h-5 w-5" /> : isAgreementDone ? <Check className="h-6 w-6" /> : <ScrollText className="h-6 w-6" />}
                         </div>
-                        <p className="text-xs text-slate-500 leading-relaxed max-w-[90%]">{isAgreementLocked ? 'Complete the Challan step to unlock the legal rental agreement generation.' : 'Generate and sign the legal rental contract details including loan and payment info.'}</p>
-                    </div>
-                </button>
+                        <div className="flex-1">
+                            <div className="flex justify-between items-center mb-1">
+                                <h4 className={`text-sm font-bold ${isAgreementLocked ? 'text-slate-400' : 'text-slate-800'}`}>{isAgreementDone ? 'View Agreement' : 'Rental Agreement'}</h4>
+                                {isAgreementLocked && <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded"><Lock className="h-3 w-3" /> LOCKED</span>}
+                                {!isAgreementLocked && isAgreementDone && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100"><CheckCircle2 className="h-3 w-3" /> COMPLETED</span>}
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed max-w-[90%]">{isAgreementLocked ? 'Complete the Challan step to unlock the legal rental agreement generation.' : 'Generate and sign the legal rental contract details including loan and payment info.'}</p>
+                        </div>
+                    </button>
+                )}
             </div>
             
             <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
@@ -608,8 +644,8 @@ const Input = ({ label, value, onChange, type="text", prefix, theme, readOnly=fa
 const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     const [loading, setLoading] = useState(false);
     
-    const [formData, setFormData] = useState(initialData || {
-      agreementType: 'NORMAL',
+    const [formData, setFormData] = useState(initialData && initialData._id ? initialData : {
+      agreementType: initialData?.agreementType || 'NORMAL',
       agreementId: '',
       model: { name: '', exShowroom: '0', insurance: '0', rto: '0', permit: '0', registration: '0', discount: '0', onRoadPrice: '0.00', landingPrice: '0.00', sellingPrice: '0.00' },
       loan: { bankName: '', amount: '', processingFee: '' },
@@ -885,11 +921,6 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
            <div className="flex-1 bg-slate-50/50 overflow-y-auto">
               <form className="p-6 md:p-8 space-y-8" onSubmit={e => e.preventDefault()}>
                   <div>
-                      <div className="flex items-center gap-4 mb-6">
-                           <button type="button" onClick={() => handleChange('agreementType', 'NORMAL')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'NORMAL' || !formData.agreementType ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Bajaj Entry</button>
-                           <button type="button" onClick={() => handleChange('agreementType', 'TYPE2')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${formData.agreementType === 'TYPE2' ? theme.primary + ' text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>EV Entry</button>
-                      </div>
-
                       <h3 className="text-xs font-extrabold text-slate-800 uppercase mb-4 flex items-center gap-2"><Car className="h-4 w-4 text-slate-400" /> Agreement & Model Details</h3>
                       <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-5">
                           <div className="md:col-span-3">
@@ -1170,14 +1201,39 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
     checklist: []
   });
   const [availableStocks, setAvailableStocks] = useState([]);
+  const [isBajaj, setIsBajaj] = useState(initialData?.details?.model === 'BAJAJ' || initialData?.details?.make === 'BAJAJ' || false);
 
   // Full Checklist
-  const checklistItems = [
+  const fullChecklistItems = [
      "Reverse Mirror", "Ignition Lock", "Steering Lock", "Remote (Central Lock)", 
      "Remote (Music System)", "Stepney Cover", "Wheels Cap", "Driver Money Box/Bag", 
      "Tools Kit", "Battery Clamp", "Looking Glass", "Mat", "Fire Extinguisher", 
      "Luggage Carrier", "Camera", "Fan", "Cabin Light", "Jack", "Form 22", "Wiper Motor"
   ];
+
+  const bajajChecklistItems = [
+      "TOOLS", "MIRRORS", "REAR", "TYRE MAKE FRONT"
+  ];
+
+  const checklistItems = isBajaj ? bajajChecklistItems : fullChecklistItems;
+
+  const handleBajajToggle = (checked) => {
+      setIsBajaj(checked);
+      if (checked) {
+          setFormData(prev => ({
+              ...prev,
+              details: { ...prev.details, model: 'BAJAJ', make: 'BAJAJ' },
+              checklist: []
+          }));
+          setAvailableColors([]); 
+      } else {
+          setFormData(prev => ({
+              ...prev,
+              details: { ...prev.details, model: '', make: 'RAJHANS' },
+              checklist: []
+          }));
+      }
+  };
 
   // Fetch stocks on mount
   useEffect(() => {
@@ -1361,7 +1417,22 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
          <div className="flex-1 bg-slate-50/50 overflow-y-auto">
             <form className="p-6 md:p-8 space-y-6" onSubmit={e => e.preventDefault()}>
                 
+                {/* Bajaj Checkbox */}
+                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                    <input 
+                        type="checkbox" 
+                        id="bajaj-checkbox"
+                        checked={isBajaj}
+                        onChange={(e) => handleBajajToggle(e.target.checked)}
+                        className={`w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer`}
+                    />
+                    <label htmlFor="bajaj-checkbox" className="text-sm font-bold text-slate-700 cursor-pointer uppercase tracking-wider">
+                        Bajaj Challan Form (Manual Entry, No Stock)
+                    </label>
+                </div>
+
                 {/* 0. SMART STOCK SELECTOR */}
+                {!isBajaj && (
                 <div className="bg-indigo-50 p-5 rounded-xl border border-indigo-100 shadow-sm flex flex-col md:flex-row items-start md:items-center gap-4">
                     <div className="flex items-center gap-3 text-indigo-500 min-w-max">
                         <Package className="h-6 w-6" />
@@ -1382,6 +1453,7 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                         ))}
                     </select>
                 </div>
+                )}
 
                 {/* 1. Basic Details */}
                 <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
@@ -1404,14 +1476,24 @@ const ChallanForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                       {/* Dynamic Model Select */}
                       <div className="col-span-12 md:col-span-4">
                           <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Model</label>
-                          <select 
-                            value={formData.details.model} 
-                            onChange={e => handleModelChange(e.target.value)} 
-                            className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring} uppercase`}
-                          >
-                            <option value="">Select Model</option>
-                            {stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}
-                          </select>
+                          {isBajaj ? (
+                              <input 
+                                  type="text" 
+                                  value={formData.details.model} 
+                                  onChange={e => handleDeepChange('details', 'model', e.target.value)} 
+                                  className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold focus:border-transparent focus:ring-1 ${theme.ring} outline-none transition-all uppercase`} 
+                                  placeholder="Type Model"
+                              />
+                          ) : (
+                              <select 
+                                value={formData.details.model} 
+                                onChange={e => handleModelChange(e.target.value)} 
+                                className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring} uppercase`}
+                              >
+                                <option value="">Select Model</option>
+                                {stocks.map(s => <option key={s._id} value={s.modelName}>{s.modelName}</option>)}
+                              </select>
+                          )}
                       </div>
 
                       {/* DTO Select or Type (Updated Options) */}
@@ -1707,6 +1789,14 @@ const Sales = ({ theme }) => {
       }
       if (actionType === 'agreement') {
           setEditingAgreementData(null);
+          setView('add-agreement');
+      }
+      if (actionType === 'agreement-bajaj') {
+          setEditingAgreementData({ agreementType: 'NORMAL' });
+          setView('add-agreement');
+      }
+      if (actionType === 'agreement-ev') {
+          setEditingAgreementData({ agreementType: 'TYPE2' });
           setView('add-agreement');
       }
       if (actionType === 'view-agreement') {

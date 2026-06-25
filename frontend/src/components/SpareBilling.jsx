@@ -44,6 +44,7 @@ const SpareBilling = ({ theme: t }) => {
     const [selectedSpareId, setSelectedSpareId] = useState('');
     const [selectedSpareQty, setSelectedSpareQty] = useState(1);
     const [selectedSparePrice, setSelectedSparePrice] = useState(0);
+    const [selectedSpareMarkStockOut, setSelectedSpareMarkStockOut] = useState(false);
 
     const [submitting, setSubmitting] = useState(false);
 
@@ -137,10 +138,11 @@ const SpareBilling = ({ theme: t }) => {
         }
 
         // Check if already in bill
-        const existingItemIndex = billItems.findIndex(item => item.stockId === spare._id && (item.discount || 0) === (Number(selectedSpareDiscount) || 0));
+        const existingItemIndex = billItems.findIndex(item => item.stockId === spare._id && (item.discount || 0) === (Number(selectedSpareDiscount) || 0) && !!item.markStockOut === !!selectedSpareMarkStockOut);
         if (existingItemIndex >= 0) {
             const updatedItems = [...billItems];
             updatedItems[existingItemIndex].qty += Number(selectedSpareQty);
+            updatedItems[existingItemIndex].markStockOut = selectedSpareMarkStockOut || updatedItems[existingItemIndex].markStockOut;
             setBillItems(updatedItems);
         } else {
             setBillItems([
@@ -150,7 +152,8 @@ const SpareBilling = ({ theme: t }) => {
                     name: spare.name,
                     qty: Number(selectedSpareQty),
                     sellingPrice: Number(selectedSparePrice),
-                    discount: Number(selectedSpareDiscount) || 0
+                    discount: Number(selectedSpareDiscount) || 0,
+                    markStockOut: selectedSpareMarkStockOut
                 }
             ]);
         }
@@ -158,6 +161,7 @@ const SpareBilling = ({ theme: t }) => {
         // Reset selection inputs
         setSelectedSpareQty(1);
         setSelectedSpareDiscount('');
+        setSelectedSpareMarkStockOut(false);
     };
 
     const handleRemoveItemFromBill = (index) => {
@@ -826,6 +830,19 @@ const SpareBilling = ({ theme: t }) => {
                                         </button>
                                     </div>
                                 </div>
+                                {availableSpares.find(s => s._id === selectedSpareId)?.isTangible && (
+                                    <div className="flex items-center">
+                                        <label className="flex items-center gap-2 cursor-pointer bg-red-50 px-4 py-2 rounded-xl border border-red-100">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedSpareMarkStockOut}
+                                                onChange={(e) => setSelectedSpareMarkStockOut(e.target.checked)}
+                                                className="w-4 h-4 accent-red-600 rounded"
+                                            />
+                                            <span className="text-sm font-bold text-red-700">Mark as completely Stock Out</span>
+                                        </label>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
