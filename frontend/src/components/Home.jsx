@@ -141,10 +141,50 @@ const Home = ({ theme: t }) => {
         const groups = {};
         stats.sales.trend.forEach(s => {
             const date = new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            groups[date] = (groups[date] || 0) + 1;
+            if (!groups[date]) groups[date] = { date, count: 0, models: [] };
+            groups[date].count++;
+            if (s.model) {
+                groups[date].models.push(s.model);
+            }
         });
-        return Object.keys(groups).map(k => ({ date: k, count: groups[k] }));
+        return Object.values(groups);
     }, [stats]);
+
+    const CustomTooltip = ({ active, payload, label }) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload;
+            
+            // Count model occurrences for a cleaner list
+            const modelCounts = {};
+            if (data.models) {
+                data.models.forEach(m => {
+                    modelCounts[m] = (modelCounts[m] || 0) + 1;
+                });
+            }
+
+            return (
+                <div className="bg-white p-3 rounded-xl shadow-xl border border-slate-100 z-50">
+                    <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">{label}</p>
+                    <div className="mb-2 flex items-baseline gap-1.5">
+                        <span className="text-2xl font-black text-emerald-500">{data.count}</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Total Units</span>
+                    </div>
+                    {Object.keys(modelCounts).length > 0 && (
+                        <div className="space-y-1">
+                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Models Delivered:</p>
+                            {Object.keys(modelCounts).map((m, i) => (
+                                <div key={i} className="flex justify-between items-center gap-4 text-[10px]">
+                                    <span className="font-bold text-slate-700 truncate max-w-[120px]">{m}</span>
+                                    <span className="font-black text-slate-500">x{modelCounts[m]}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        return null;
+    };
 
     const leadPieData = [
         { name: 'Hot', value: leadStats.hot },
@@ -378,9 +418,8 @@ const Home = ({ theme: t }) => {
                                     <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }} dy={8} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }} />
                                     <Tooltip 
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                        itemStyle={{ color: '#1e293b', fontWeight: 800, fontSize: '12px' }}
-                                        labelStyle={{ color: '#64748b', fontSize: '9px', fontWeight: 800, textTransform: 'uppercase' }}
+                                        content={<CustomTooltip />}
+                                        cursor={{ fill: 'rgba(0,0,0,0.02)' }}
                                     />
                                     <Area type="monotone" dataKey="count" fill="url(#colorCount)" stroke="none" />
                                     <Bar dataKey="count" barSize={14} fill={THEME_COLOR} radius={[3, 3, 0, 0]} />
