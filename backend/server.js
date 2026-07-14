@@ -1,0 +1,2139 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const path = require('path');
+
+dotenv.config();
+
+// --- Inline User Model (avoids relative path issues in serverless) ---
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['user', 'admin'], default: 'user' }
+});
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+const app = express();
+const frontendPath = path.join(__dirname, '../frontend/dist');
+
+
+// --- CORS: allow env-configured origin (or any in dev) ---
+const allowedOrigin = process.env.ALLOWED_ORIGIN ? process.env.ALLOWED_ORIGIN.trim() : true;
+app.use(cors({
+  origin: allowedOrigin,
+
+  credentials: true,
+}));
+app.use(express.json());
+
+// --- Serverless-safe MongoDB connection (cached) ---
+let cachedConnection = null;
+const connectDB = async () => {
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    return cachedConnection;
+  }
+  // Trim to remove any trailing whitespace/newlines from env var
+  const uri = (process.env.MONGO_URI || '').trim();
+  cachedConnection = await mongoose.connect(uri);
+  console.log('✅ MongoDB connected');
+  return cachedConnection;
+};
+connectDB().catch(err => console.error('❌ MongoDB Error:', err));
+
+
+
+// ==========================================
+//  SCHEMAS
+// ==========================================
+
+// 1. Customer Schema (CRM)
+const CustomerSchema = new mongoose.Schema({
+  generatedId: { type: String, required: true, unique: true },
+  personal: {
+    title: String,
+    firstName: String,
+    lastName: String,
+    fatherName: String,
+    mobile: String,
+    email: String,
+  },
+  address: {
+    village: String,
+    district: String,
+    postOffice: String,
+    policeStation: String,
+    pincode: String,
+  },
+  pipeline: {
+    created: { type: Boolean, default: true },
+    challan: { type: Boolean, default: false },
+    agreement: { type: Boolean, default: false },
+  },
+  createdAt: { type: Date, default: Date.now }
+});
+const Customer = mongoose.models.Customer || mongoose.model('Customer', CustomerSchema);
+
+// 2. Challan Schema
+const ChallanSchema = new mongoose.Schema({
+  customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  details: {
+    challanNo: String,
+    challanDate: Date,
+    model: String,
+    dto: String,
+    make: String,
+    color: String,
+    variant: String,
+    voltage: String,
+  },
+  registration: {
+    productNo: String,
+    bookNo: String,
+    keyNo: String,
+    batteryNo: String,
+    batteryCompany: String,
+    chargerNo: String,
+    chargerCompany: String,
+  },
+  engine: {
+    frameNo: String,
+    engineNo: String,
+    cylinderNo: String,
+    motorNo: String,
+  },
+  ids: {
+    aadhar: String,
+    pan: String,
+  },
+  checklist: [String], 
+  createdAt: { type: Date, default: Date.now }
+});
+const Challan = mongoose.models.Challan || mongoose.model('Challan', ChallanSchema);
+
+// 3. Agreement Schema
+const AgreementSchema = new mongoose.Schema({
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  agreementId: String,
+  agreementType: { type: String, default: 'NORMAL' },
+  model: {
+    name: String,
+    exShowroom: String,
+    insurance: String,
+    rto: String,
+    permit: String,
+    registration: String,
+    discount: String,
+    onRoadPrice: String,
+    landingPrice: String,
+    sellingPrice: String
+  },
+  loan: {
+    bankName: String,
+    amount: String,
+    processingFee: String
+  },
+  dto: {
+    place: String,
+    registration: String,
+    onlinePayment: String,
+    permit: String,
+    total: String
+  },
+  broker: {
+    name: String,
+    phone: String,
+    village: String,
+    amount: String
+  },
+  payment: {
+    downPaymentAuto: String,
+    downPayment: String,
+    discount: String,
+    paidAmount: String,
+    type: { type: String }, 
+    date: Date,
+    dues: String,
+    netDues: String
+  },
+  other: {
+    amount: String,
+    remark: String
+  },
+  dse: {
+    name: String,
+    commission: String,
+    dseCommission: String,
+    netProfit: String,
+    tds: String,
+    finalNetProfit: String
+  },
+  magadhMargin: String,
+  registrationNo: String,
+  permitNo: String,
+  permitDate: Date,
+  createdAt: { type: Date, default: Date.now }
+});
+const Agreement = mongoose.models.Agreement || mongoose.model('Agreement', AgreementSchema);
+
+// 5. COLLECTION SCHEMA (For Installments)
+const CollectionSchema = new mongoose.Schema({
+  agreementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agreement', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  amount: { type: Number, required: true },
+  method: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Bank Transfer'], default: 'Cash' },
+  date: { type: Date, default: Date.now },
+  ledgerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Ledger' }
+});
+const Collection = mongoose.models.Collection || mongoose.model('Collection', CollectionSchema);
+
+// 6. EMPLOYEE SCHEMA (For Staff & Payroll)
+const EmployeeSchema = new mongoose.Schema({
+  personal: {
+    firstName: String,
+    lastName: String,
+    phone: String,
+    email: String,
+    dob: String,
+    bloodGroup: String,
+    address: String
+  },
+  professional: {
+    employeeId: { type: String, unique: true },
+    role: { type: String, default: 'DSE' },
+    status: { type: String, enum: ['Active', 'On Leave', 'Probation', 'Left'], default: 'Probation' },
+    location: { type: String, default: 'Showroom' },
+    joinDate: { type: Date, default: Date.now },
+  },
+  financial: {
+    baseSalary: { type: Number, default: 0 },
+    allowance: { type: Number, default: 0 },
+    incentives: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 }
+  },
+  createdAt: { type: Date, default: Date.now }
+});
+const Employee = mongoose.models.Employee || mongoose.model('Employee', EmployeeSchema);
+ 
+// 6.5 SALARY RECORD SCHEMA (Monthly Payments)
+const SalaryRecordSchema = new mongoose.Schema({
+  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Employee', required: true },
+  month: { type: String, required: true }, // e.g: "March"
+  year: { type: Number, required: true },  // e.g: 2026
+  baseSalary: Number,
+  allowance: Number,
+  incentives: Number,
+  tax: Number,
+  otherAmount: { type: Number, default: 0 },
+  remark: { type: String, default: '' },
+  totalPayable: Number,
+  payableDays: { type: Number, default: 30 },
+  totalDaysInMonth: { type: Number, default: 30 },
+  selectedDates: [{ type: String }],
+  paymentDate: { type: Date, default: Date.now },
+  status: { type: String, enum: ['Paid', 'Pending', 'Adjusted'], default: 'Paid' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SalaryRecord = mongoose.models.SalaryRecord || mongoose.model('SalaryRecord', SalaryRecordSchema);
+ 
+// 6.7 EXPENSE SCHEMA
+const ExpenseSchema = new mongoose.Schema({
+  id: String, // Auto-generated ID (e.g., EXP-001)
+  category: { type: String, required: true },
+  description: String,
+  amount: { type: Number, required: true },
+  date: { type: Number, required: true }, // Day of month (1-31)
+  month: { type: String, required: true },
+  year: { type: Number, required: true },
+  status: { type: String, default: 'Paid' },
+  type: { type: String, enum: ['Manual', 'Payroll'], default: 'Manual' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Expense = mongoose.models.Expense || mongoose.model('Expense', ExpenseSchema);
+
+// 6.8 LEDGER SCHEMA (Business Transactions)
+const LedgerSchema = new mongoose.Schema({
+  date: { type: Date, required: true },
+  description: { type: String, required: true },
+  category: { type: String, default: 'General' },
+  type: { type: String, enum: ['Credit', 'Debit'], required: true },
+  amount: { type: Number, required: true },
+  balance: { type: Number, required: true }, // Running balance
+  partyName: { type: String, default: '' },
+  paymentMethod: { type: String, default: 'Cash' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Ledger = mongoose.models.Ledger || mongoose.model('Ledger', LedgerSchema);
+
+// 7. NEW INVENTORY SCHEMAS (Two-Tier)
+
+// Tier 1: Vehicle Model (Catalog Name)
+const VehicleModelSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true, trim: true }, // e.g., "Rajhans Star"
+  type: { type: String, default: 'E-Rickshaw' },
+  createdAt: { type: Date, default: Date.now }
+});
+const VehicleModel = mongoose.models.VehicleModel || mongoose.model('VehicleModel', VehicleModelSchema);
+
+// Tier 2: Vehicle Stock (Individual Physical Units)
+const VehicleStockSchema = new mongoose.Schema({
+  modelId: { type: mongoose.Schema.Types.ObjectId, ref: 'VehicleModel', required: true },
+  
+  // Configuration
+  variant: { type: String, enum: ['Lead Acid', 'Lithium Ion'], required: true },
+  voltage: { type: String, enum: ['48V', '60V'], required: true },
+  color: { type: String, default: 'Red' },
+
+  // Technical Identifiers
+  chassisNo: { type: String, required: true, unique: true, trim: true },
+  motorNo: { type: String, trim: true },
+  batteryNo: { type: String, trim: true },
+  batteryCompany: { type: String, trim: true, default: '' },
+  chargerNo: { type: String, trim: true, default: '' },
+  chargerCompany: { type: String, trim: true, default: '' },
+
+  // Financials
+  purchaseRate: { type: Number, default: 0 },
+  hsn: { type: String, default: '' },
+  
+  // Status
+  status: { type: String, enum: ['Available', 'Sold', 'Booked'], default: 'Available' },
+  createdAt: { type: Date, default: Date.now }
+});
+const VehicleStock = mongoose.models.VehicleStock || mongoose.model('VehicleStock', VehicleStockSchema);
+
+
+// ==========================================
+// SPARE STOCK SCHEMAS
+// ==========================================
+
+const SpareCategorySchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true, trim: true },
+  description: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SpareCategory = mongoose.models.SpareCategory || mongoose.model('SpareCategory', SpareCategorySchema);
+
+const SpareStockSchema = new mongoose.Schema({
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareCategory', required: true },
+  name: { type: String, required: true, trim: true },
+  qty: { type: Number, default: 0 },
+  purchaseRate: { type: Number, default: 0 },
+  status: { type: String, enum: ['Available', 'Out of Stock'], default: 'Available' },
+  manualStockOut: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+const SpareStock = mongoose.models.SpareStock || mongoose.model('SpareStock', SpareStockSchema);
+
+const SpareBillSchema = new mongoose.Schema({
+  customerName: { type: String, required: true, trim: true },
+  customerPhone: { type: String, trim: true },
+  customerVillage: { type: String, trim: true, default: '' },
+  items: [{
+    stockId: { type: mongoose.Schema.Types.ObjectId, ref: 'SpareStock', required: true },
+    name: { type: String, required: true },
+    qty: { type: Number, required: true },
+    sellingPrice: { type: Number, required: true },
+    discount: { type: Number, default: 0 }
+  }],
+  totalAmount: { type: Number, required: true },
+  labourCharge: { type: Number, default: 0 },
+  labourRemark: { type: String, trim: true, default: '' },
+  labourList: [{
+    amount: { type: Number, required: true },
+    remark: { type: String, required: true },
+    discount: { type: Number, default: 0 }
+  }],
+  isFreeService: { type: Boolean, default: false },
+  serviceNumber: { type: String, default: '' },
+  paymentMethod: { type: String, enum: ['Cash', 'UPI', 'Cheque', 'Bank Transfer'], default: 'Cash' },
+  createdAt: { type: Date, default: Date.now }
+});
+const SpareBill = mongoose.models.SpareBill || mongoose.model('SpareBill', SpareBillSchema);
+
+// ==========================================
+//  MIDDLEWARE
+// ==========================================
+
+const verifyToken = (req, res, next) => {
+  const token = req.headers['authorization'];
+  if (!token) return res.status(403).json({ message: 'No token provided' });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) return res.status(401).json({ message: 'Unauthorized' });
+    req.userId = decoded.id;
+    req.userRole = decoded.role;
+    next();
+  });
+};
+
+// ==========================================
+//  ROUTES
+// ==========================================
+
+// --- Auth Routes ---
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { username, email, password, role } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await User.create({ username, email, password: hashedPassword, role: role || 'user' });
+    res.status(201).json({ message: 'User created successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token, user: { id: user._id, username: user.username, role: user.role } });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. ENQUIRY SCHEMA (CRM)
+const EnquirySchema = new mongoose.Schema({
+  Name: String,
+  Phone: String,
+  Village: String,
+  Model: String,
+  status: { type: String, default: 'New' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Enquiry = mongoose.models.Enquiry || mongoose.model('Enquiry', EnquirySchema);
+
+// --- Dashboard Stats Route ---
+app.get('/api/dashboard/stats', verifyToken, async (req, res) => {
+  try {
+    const now = new Date();
+    const currentMonth = now.toLocaleString('default', { month: 'long' });
+    const currentYear = now.getFullYear();
+
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = lastMonthDate.toLocaleString('default', { month: 'long' });
+    const lastMonthYear = lastMonthDate.getFullYear();
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // 1. Profit (Calculate using Agreements but filtered by the Challan Date)
+    const currentMonthChallans = await Challan.find({
+      'details.challanDate': { $gte: startOfMonth, $lte: endOfMonth }
+    });
+    const currentMonthCustomerIds = currentMonthChallans.map(c => c.customer);
+    const agreements = await Agreement.find({ customerId: { $in: currentMonthCustomerIds } });
+    
+    const currentMonthProfit = agreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
+    const currentMonthRevenue = agreements.reduce((acc, curr) => acc + (Number(curr.payment?.paidAmount) || 0), 0);
+
+    const startOfLastMonth = new Date(lastMonthYear, lastMonthDate.getMonth(), 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const lastMonthChallans = await Challan.find({
+      'details.challanDate': { $gte: startOfLastMonth, $lte: endOfLastMonth }
+    });
+    const lastMonthCustomerIds = lastMonthChallans.map(c => c.customer);
+    const lastMonthAgreements = await Agreement.find({ customerId: { $in: lastMonthCustomerIds } });
+
+    const lastMonthProfit = lastMonthAgreements.reduce((acc, curr) => acc + (Number(curr.dse?.finalNetProfit) || 0), 0);
+    const profitGrowth = lastMonthProfit === 0 ? 100 : ((currentMonthProfit - lastMonthProfit) / lastMonthProfit) * 100;
+
+    // 2. Enquiries (Filtered by this month)
+    const totalEnquiries = await Enquiry.countDocuments({ status: { $ne: 'Closed' }, createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
+    const hotEnquiries = await Enquiry.countDocuments({ status: 'Hot', createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
+    const newEnquiries = await Enquiry.countDocuments({ status: 'New', createdAt: { $gte: startOfMonth, $lte: endOfMonth } });
+
+    // 3. Inventory
+    const totalInventory = await VehicleStock.countDocuments({ status: 'Available' });
+    const lowStockAlert = await VehicleStock.findOne({ status: 'Available' }).populate('modelId');
+    
+    // 4. Pending Dues
+    const allAgreements = await Agreement.find();
+    const totalDues = allAgreements.reduce((acc, curr) => acc + (Number(curr.payment?.netDues) || 0), 0);
+    const overdueCount = allAgreements.filter(a => Number(a.payment?.netDues) > 0).length;
+
+    // 5. Staff Presence
+    const activeStaff = await Employee.countDocuments({ 'professional.status': 'Active' });
+    const totalStaff = await Employee.countDocuments();
+
+    // 6. Expenses
+    const currentMonthExpenses = await Expense.find({ month: currentMonth, year: currentYear });
+    const totalExpenses = currentMonthExpenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const payrollExpenses = currentMonthExpenses.filter(e => e.type === 'Payroll').reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const payrollPercentage = totalExpenses === 0 ? 0 : Math.round((payrollExpenses / totalExpenses) * 100);
+
+    res.json({
+      revenue: {
+        amount: currentMonthProfit, // User wants this to be Net Profit
+        growth: profitGrowth.toFixed(1)
+      },
+      collections: { // Kept separate just in case
+        amount: currentMonthRevenue 
+      },
+      enquiries: {
+        total: totalEnquiries,
+        hot: hotEnquiries,
+        new: newEnquiries
+      },
+      inventory: {
+        total: totalInventory,
+        alert: lowStockAlert ? `${lowStockAlert.modelId.name} (${lowStockAlert.color})` : 'Stable'
+      },
+      dues: {
+        amount: totalDues,
+        customers: overdueCount
+      },
+      staff: {
+        active: activeStaff,
+        total: totalStaff
+      },
+      expenses: {
+        amount: totalExpenses,
+        payrollPercentage
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Non-Monetary Analytics Route ---
+app.get('/api/dashboard/non-monetary-analytics', verifyToken, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    let dateFilter = {};
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter = { $gte: start, $lte: end };
+    }
+
+    // 1. Vehicles Sold (from Challan)
+    const challanQuery = dateFilter.$gte ? { 'details.challanDate': dateFilter } : {};
+    const challans = await Challan.find(challanQuery).populate('customer').lean();
+    
+    const salesTrend = challans.map(c => ({
+      date: c.details?.challanDate,
+      model: c.details?.model,
+      customerName: c.customer?.personal?.firstName + ' ' + (c.customer?.personal?.lastName || ''),
+    }));
+
+    // 2. Spares Volume
+    const spareQuery = dateFilter.$gte ? { createdAt: dateFilter } : {};
+    const spareBills = await SpareBill.find(spareQuery).lean();
+    let totalSparesSold = 0;
+    spareBills.forEach(bill => {
+      bill.items?.forEach(item => {
+        totalSparesSold += (item.qty || 0);
+      });
+    });
+
+    // 3. Current Stock
+    const availableStock = await VehicleStock.find({ status: 'Available' }).populate('modelId').lean();
+    const stockByModel = {};
+    availableStock.forEach(stock => {
+      const modelName = stock.modelId?.name || 'Unknown';
+      stockByModel[modelName] = (stockByModel[modelName] || 0) + 1;
+    });
+
+    // 4. Staff Active
+    const activeStaff = await Employee.countDocuments({ 'professional.status': 'Active' });
+
+    res.json({
+      sales: {
+        total: challans.length,
+        trend: salesTrend
+      },
+      spares: {
+        totalSold: totalSparesSold
+      },
+      stock: {
+        total: availableStock.length,
+        byModel: Object.keys(stockByModel).map(key => ({ name: key, count: stockByModel[key] }))
+      },
+      staff: {
+        active: activeStaff
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- CRM Routes (Customers) ---
+
+app.get('/api/customers', verifyToken, async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const challans = await Challan.find({ customer: { $in: customers.map(c => c._id) } }, 'customer details.challanDate').lean();
+    
+    const enrichedCustomers = customers.map(c => {
+      const challan = challans.find(ch => ch.customer.toString() === c._id.toString());
+      return {
+        ...c,
+        challanDate: challan?.details?.challanDate || null
+      };
+    });
+    
+    res.json(enrichedCustomers);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/customers/export', verifyToken, async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const challans = await Challan.find().lean();
+    const agreements = await Agreement.find().lean();
+
+    const result = customers.map(c => {
+      const customerIdStr = c._id.toString();
+      const challan = challans.find(ch => ch.customer.toString() === customerIdStr);
+      const agreement = agreements.find(ag => ag.customerId.toString() === customerIdStr);
+
+      return {
+        customer: c,
+        challan: challan || null,
+        agreement: agreement || null
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/customers', verifyToken, async (req, res) => {
+  try {
+    const { personal, address } = req.body;
+    const generatedId = `CUS-${Date.now().toString().slice(-4)}`;
+    const newCustomer = await Customer.create({
+      generatedId,
+      personal,
+      address,
+      pipeline: { created: true, challan: false, agreement: false }
+    });
+    res.status(201).json(newCustomer);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Challan Routes ---
+
+app.post('/api/challan', verifyToken, async (req, res) => {
+  try {
+    const { customerId, details, registration, engine, ids, checklist } = req.body;
+
+    // Auto-generate Challan No
+    const lastChallan = await Challan.findOne().sort({ createdAt: -1 });
+    let nextChallanNo = 1001;
+
+    if (lastChallan && lastChallan.details && lastChallan.details.challanNo) {
+      const lastNo = parseInt(lastChallan.details.challanNo, 10);
+      if (!isNaN(lastNo)) {
+        nextChallanNo = lastNo + 1;
+      }
+    }
+
+    const finalDetails = {
+        ...details,
+        challanNo: nextChallanNo.toString()
+    };
+
+    const newChallan = await Challan.create({
+      customer: customerId,
+      details: finalDetails,
+      registration,
+      engine,
+      ids,
+      checklist
+    });
+    
+    // Deduct stock - aggressively clean chassis number
+    if (engine && engine.frameNo) {
+        const normalizedFrameNo = engine.frameNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        console.log(`[CHALLAN CREATE] Looking for chassis: "${normalizedFrameNo}"`);
+        const stockResult = await VehicleStock.findOneAndUpdate(
+            { chassisNo: normalizedFrameNo }, 
+            { status: 'Sold' },
+            { new: true }
+        );
+        console.log(`[CHALLAN CREATE] Stock update result:`, stockResult ? `Found & marked Sold (${stockResult._id})` : 'NOT FOUND in stock');
+    }
+
+    await Customer.findByIdAndUpdate(customerId, { $set: { 'pipeline.challan': true } });
+    res.status(201).json(newChallan);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/challan/:customerId', verifyToken, async (req, res) => {
+  try {
+    const challan = await Challan.findOne({ customer: req.params.customerId });
+    if (!challan) return res.status(404).json({ message: 'Challan not found' });
+    res.json(challan);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/challan/:id', verifyToken, async (req, res) => {
+  try {
+    const oldChallan = await Challan.findById(req.params.id);
+    const updatedChallan = await Challan.findByIdAndUpdate(
+      req.params.id, 
+      { $set: req.body }, 
+      { new: true }
+    );
+
+    // Stock Sync Logic - ALWAYS run to ensure chassis is marked Sold
+    if (req.body.engine && req.body.engine.frameNo) {
+        const newFrame = req.body.engine.frameNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        const oldFrame = (oldChallan?.engine?.frameNo || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+        console.log(`[CHALLAN UPDATE] Old frame: "${oldFrame}", New frame: "${newFrame}"`);
+
+        // If chassis changed, release old one
+        if (oldFrame && oldFrame !== newFrame) {
+            await VehicleStock.findOneAndUpdate({ chassisNo: oldFrame }, { status: 'Available' });
+            console.log(`[CHALLAN UPDATE] Released old chassis: ${oldFrame}`);
+        }
+
+        // ALWAYS mark current chassis as Sold
+        if (newFrame) {
+            const stockResult = await VehicleStock.findOneAndUpdate(
+                { chassisNo: newFrame }, 
+                { status: 'Sold' },
+                { new: true }
+            );
+            console.log(`[CHALLAN UPDATE] Mark Sold result:`, stockResult ? `Done (${stockResult._id})` : 'NOT FOUND in stock');
+        }
+    }
+
+    res.json(updatedChallan);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// --- Bulk Stock Sync (Fix existing challans) ---
+app.post('/api/challan/sync-stock', verifyToken, async (req, res) => {
+  try {
+    const allChallans = await Challan.find({ 'engine.frameNo': { $exists: true, $ne: '' } });
+    let matched = 0, notFound = 0;
+
+    for (const challan of allChallans) {
+      const frame = (challan.engine?.frameNo || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (!frame) continue;
+
+      const result = await VehicleStock.findOneAndUpdate(
+        { chassisNo: frame },
+        { status: 'Sold' },
+        { new: true }
+      );
+      if (result) { matched++; } else { notFound++; }
+    }
+    
+    console.log(`[SYNC] Processed ${allChallans.length} challans. Matched: ${matched}, Not in stock: ${notFound}`);
+    res.json({ message: `Sync complete. ${matched} units marked Sold. ${notFound} chassis not found in stock.`, matched, notFound });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Agreement Routes ---
+
+app.post('/api/agreement', verifyToken, async (req, res) => {
+  try {
+    // Auto-generate Agreement ID (starts from 1001)
+    const lastAgreement = await Agreement.findOne().sort({ createdAt: -1 });
+    let nextNo = 1001;
+
+    if (lastAgreement && lastAgreement.agreementId) {
+      const lastNo = parseInt(lastAgreement.agreementId, 10);
+      if (!isNaN(lastNo)) {
+        nextNo = lastNo + 1;
+      }
+    }
+
+    const payload = { ...req.body };
+    if (!payload.agreementId) {
+        payload.agreementId = nextNo.toString();
+    }
+
+    const newAgreement = await Agreement.create(payload);
+    await Customer.findByIdAndUpdate(payload.customerId, { $set: { 'pipeline.agreement': true } });
+
+    res.status(201).json(newAgreement);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/api/agreement/:customerId', verifyToken, async (req, res) => {
+  try {
+    const agreement = await Agreement.findOne({ customerId: req.params.customerId });
+    if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
+    res.json(agreement);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get all agreements for a specific staff (DSE) by name
+app.get('/api/agreements/staff/:name', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find({ 'dse.name': req.params.name })
+                                     .populate('customerId')
+                                     .sort({ createdAt: -1 });
+    res.json(agreements);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// GET: All agreements for Registration Queue with enriched data
+app.get('/api/agreements/registration-queue', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find()
+                                     .populate('customerId')
+                                     .sort({ createdAt: -1 });
+    
+    const enriched = await Promise.all(agreements.map(async (agg) => {
+      // Try to find matching chassis no from Challan
+      const challan = await Challan.findOne({ customer: agg.customerId?._id });
+      return {
+        ...agg.toObject(),
+        chassis: challan?.engine?.frameNo || 'N/A'
+      };
+    }));
+    
+    res.json(enriched);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.put('/api/agreement/:id', verifyToken, async (req, res) => {
+  try {
+    const updatedAgreement = await Agreement.findByIdAndUpdate(
+      req.params.id, 
+      { $set: req.body }, 
+      { new: true }
+    );
+    res.json(updatedAgreement);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// --- NEW INVENTORY ROUTES ---
+
+// 1. Get Models (Sidebar)
+app.get('/api/models', verifyToken, async (req, res) => {
+  try {
+    const models = await VehicleModel.find().sort({ name: 1 });
+    
+    // Add "stockCount" to each model
+    const modelsWithCount = await Promise.all(models.map(async (model) => {
+      let count = 0;
+      if (model.name && model.name.toUpperCase() !== 'BAJAJ') {
+        count = await VehicleStock.countDocuments({ 
+          modelId: model._id, 
+          status: 'Available' 
+        });
+      }
+      return { ...model.toObject(), stockCount: count };
+    }));
+
+    res.json(modelsWithCount);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2. Add New Model
+app.post('/api/models', verifyToken, async (req, res) => {
+  try {
+    const { name, type } = req.body;
+    const existing = await VehicleModel.findOne({ name });
+    if (existing) return res.status(400).json({ message: 'Model already exists' });
+
+    const newModel = await VehicleModel.create({ 
+        name, 
+        type: type || 'E-Rickshaw'
+    });
+    res.status(201).json(newModel);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 2.1 Update Model
+app.put('/api/models/:id', verifyToken, async (req, res) => {
+    try {
+        const { name, type } = req.body;
+        const updated = await VehicleModel.findByIdAndUpdate(
+            req.params.id,
+            { name, type },
+            { new: true }
+        );
+        res.json(updated);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 2.2 Delete Model (Only if no stock units exist)
+app.delete('/api/models/:id', verifyToken, async (req, res) => {
+    try {
+        // Security: Deleting a model requires checking if stock exists
+        const stockCount = await VehicleStock.countDocuments({ modelId: req.params.id });
+        if (stockCount > 0) {
+            return res.status(400).json({ message: `Cannot delete model. ${stockCount} units are still in stock.` });
+        }
+        await VehicleModel.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Model deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3.01 Get ALL Stocks for Export
+app.get('/api/stocks/all/export', verifyToken, async (req, res) => {
+  try {
+    const stocks = await VehicleStock.find().populate('modelId').sort({ createdAt: -1 });
+    res.json(stocks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Get Stocks for a specific Model (Main Dashboard Table)
+app.get('/api/stocks/:modelId', verifyToken, async (req, res) => {
+  try {
+    const stocks = await VehicleStock.find({ modelId: req.params.modelId }).sort({ createdAt: -1 });
+    res.json(stocks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3.1 Get Stock by Chassis Number (For Agreement Auto-fill)
+app.get('/api/stocks/chassis/:chassisNo', verifyToken, async (req, res) => {
+    try {
+        const stock = await VehicleStock.findOne({ chassisNo: req.params.chassisNo }).populate('modelId');
+        if (!stock) return res.status(404).json({ message: 'Stock not found' });
+        res.json(stock);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3.1.5 Get ALL stocks (Used for Invoice where stock might be 'Sold')
+app.get('/api/all-stocks', verifyToken, async (req, res) => {
+    try {
+        const stocks = await VehicleStock.find().populate('modelId').sort({ createdAt: -1 });
+        res.json(stocks);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 3.2 Get ALL available stocks (For Challan Auto-fill)
+app.get('/api/available-stocks', verifyToken, async (req, res) => {
+    try {
+        const stocks = await VehicleStock.find({ status: 'Available' }).populate('modelId');
+        res.json(stocks);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 4. Add Specific Stock Unit
+app.post('/api/stocks', verifyToken, async (req, res) => {
+  try {
+    const { 
+      modelId, variant, voltage, 
+      chassisNo, motorNo, batteryNo, color, 
+      purchaseRate, hsn,
+      exShowroom, insurance, rto, permit 
+    } = req.body;
+
+    const existingItem = await VehicleStock.findOne({ chassisNo });
+    if (existingItem) {
+      return res.status(400).json({ message: 'Vehicle with this Chassis Number already exists' });
+    }
+
+    const newStock = await VehicleStock.create({
+      modelId, variant, voltage, chassisNo, motorNo, batteryNo, color,
+      purchaseRate: Number(purchaseRate) || 0,
+      hsn,
+      exShowroom: Number(exShowroom) || 0,
+      insurance: Number(insurance) || 0,
+      rto: Number(rto) || 0,
+      permit: Number(permit) || 0
+    });
+
+    res.status(201).json(newStock);
+  } catch (error) {
+    console.error("Stock Add Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 5. Delete Stock Unit
+app.delete('/api/stocks/:id', verifyToken, async (req, res) => {
+  try {
+    await VehicleStock.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Stock unit deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. Update Stock (e.g., mark as sold)
+app.put('/api/stocks/:id', verifyToken, async (req, res) => {
+    try {
+      const updatedStock = await VehicleStock.findByIdAndUpdate(
+        req.params.id,
+        { $set: req.body },
+        { new: true }
+      );
+      res.json(updatedStock);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+
+// 7. Aggregate Inventory (For Sales/Challan Dropdowns)
+app.get('/api/inventory', verifyToken, async (req, res) => {
+  try {
+    const models = await VehicleModel.find().sort({ name: 1 });
+    const inventory = await Promise.all(models.map(async (model) => {
+      const stocks = await VehicleStock.find({ 
+        modelId: model._id, 
+        status: 'Available' 
+      });
+      // Extract unique colors from stock units
+      const uniqueColors = [...new Set(stocks.map(s => s.color).filter(c => c))];
+      
+      const firstStock = stocks[0] || {};
+      
+      return {
+        _id: model._id,
+        modelName: model.name, // Maps to 'modelName' context in Sales.jsx
+        colors: uniqueColors,
+        pricing: {
+            exShowroom: firstStock.exShowroom || 0,
+            insurance: firstStock.insurance || 0,
+            rto: firstStock.rto || 0,
+            permit: firstStock.permit || 0
+        }
+      };
+    }));
+    res.json(inventory);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 8. Sales Analytics Aggregator
+app.get('/api/analytics/sales', verifyToken, async (req, res) => {
+  try {
+    const { range, month, year } = req.query;
+    let challanQuery = {};
+    const now = new Date();
+    
+    if (range) {
+        if (range === 'This Month') {
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+            challanQuery['details.challanDate'] = { $gte: start, $lte: end };
+        } else if (range === 'Last Month') {
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+            challanQuery['details.challanDate'] = { $gte: start, $lte: end };
+        } else if (range === 'Custom Month' && month && year) {
+            const monthIdx = new Date(`${month} 1, 2000`).getMonth();
+            const start = new Date(year, monthIdx, 1);
+            const end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+            challanQuery['details.challanDate'] = { $gte: start, $lte: end };
+        } else if (range === 'All Time') {
+            challanQuery = {}; 
+        }
+    } else {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        challanQuery['details.challanDate'] = { $gte: start, $lte: end };
+    }
+
+    const challans = await Challan.find(challanQuery);
+    const customerIds = challans.map(c => c.customer);
+
+    // Map each customer to their challan date for accurate historical rendering
+    const challanDateMap = {};
+    challans.forEach(c => {
+       if (c.customer && c.details?.challanDate) {
+          challanDateMap[c.customer.toString()] = new Date(c.details.challanDate);
+       }
+    });
+
+    // If 'All Time', fetch all agreements. Otherwise filter strictly by Challans
+    const agreementQuery = (range === 'All Time' || (Object.keys(challanQuery).length === 0 && !challanQuery['details.challanDate'])) 
+        ? {} 
+        : { customerId: { $in: customerIds } };
+        
+    const agreements = await Agreement.find(agreementQuery).sort({ createdAt: 1 });
+
+    let expenseQuery = {};
+    const monthsFull = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const shortToFull = { "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April", "May": "May", "Jun": "June", "Jul": "July", "Aug": "August", "Sep": "September", "Oct": "October", "Nov": "November", "Dec": "December" };
+    
+    if (range) {
+        if (range === 'This Month') {
+            expenseQuery.month = monthsFull[now.getMonth()];
+            expenseQuery.year = now.getFullYear();
+        } else if (range === 'Last Month') {
+            const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            expenseQuery.month = monthsFull[lastMonthDate.getMonth()];
+            expenseQuery.year = lastMonthDate.getFullYear();
+        } else if (range === 'Custom Month' && month && year) {
+            expenseQuery.month = shortToFull[month] || month;
+            expenseQuery.year = Number(year);
+        } else if (range === 'All Time') {
+            expenseQuery = {}; 
+        }
+    } else {
+        expenseQuery.month = monthsFull[now.getMonth()];
+        expenseQuery.year = now.getFullYear();
+    }
+    const expenses = await Expense.find(expenseQuery);
+    const totalExpenses = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    
+    // KPI Aggregation
+    const stats = agreements.reduce((acc, curr) => {
+      const profit = parseFloat(curr.dse.finalNetProfit) || 0;
+      acc.netProfit += profit;
+      if (curr.agreementType === 'TYPE2') {
+          acc.evNetProfit += profit;
+      } else {
+          acc.bajajNetProfit += profit;
+      }
+      acc.tds += parseFloat(curr.dse.tds) || 0;
+      acc.pendingDues += parseFloat(curr.payment.netDues) || 0;
+      acc.dseComm += parseFloat(curr.dse.dseCommission) || 0;
+      return acc;
+    }, { netProfit: 0, evNetProfit: 0, bajajNetProfit: 0, tds: 0, pendingDues: 0, dseComm: 0 });
+
+    // Monthly Trends (Last 12 months)
+    const monthlyMap = {};
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    
+    const formatter = new Intl.NumberFormat('en-IN', {
+        maximumFractionDigits: 0
+    });
+
+    agreements.forEach(agg => {
+      const date = challanDateMap[agg.customerId?.toString()] || new Date(agg.createdAt);
+      const monthLabel = months[date.getMonth()];
+      if (!monthlyMap[monthLabel]) {
+        monthlyMap[monthLabel] = { name: monthLabel, revenue: 0, expenses: 0, profit: 0 };
+      }
+      monthlyMap[monthLabel].revenue += (parseFloat(agg.model.onRoadPrice) || 0); 
+      monthlyMap[monthLabel].profit += (parseFloat(agg.dse.finalNetProfit) || 0);
+    });
+
+    expenses.forEach(exp => {
+      if (exp.month) {
+        const monthLabel = exp.month.substring(0, 3);
+        if (!monthlyMap[monthLabel]) {
+          monthlyMap[monthLabel] = { name: monthLabel, revenue: 0, expenses: 0, profit: 0 };
+        }
+        monthlyMap[monthLabel].expenses += (parseFloat(exp.amount) || 0);
+      }
+    });
+
+    const financialMixedData = Object.values(monthlyMap).sort((a, b) => months.indexOf(a.name) - months.indexOf(b.name));
+
+    // Model Distribution
+    const modelMap = {};
+    agreements.forEach(agg => {
+      const name = agg.model.name || 'Unknown';
+      modelMap[name] = (modelMap[name] || 0) + 1;
+    });
+
+    const modelDistribution = Object.entries(modelMap).map(([name, value]) => ({
+      name,
+      value
+    }));
+
+    // Recent Sales Log
+    const recentSales = agreements.slice(-5).reverse().map(agg => ({
+        id: agg.agreementId || agg._id.toString().slice(-6),
+        customer: 'Customer',
+        model: agg.model.name,
+        date: (challanDateMap[agg.customerId?.toString()] || new Date(agg.createdAt)).toLocaleDateString(),
+        amount: `₹ ${formatter.format(parseFloat(agg.model.onRoadPrice) || 0)}`,
+        status: parseFloat(agg.payment.netDues) <= 0 ? 'Paid' : 'Pending'
+    }));
+
+    // DSE Performance
+    const dseMap = {};
+    agreements.forEach(agg => {
+        const name = agg.dse.name || 'Unassigned';
+        if (!dseMap[name]) dseMap[name] = { name, leads: 0, closed: 0, revenue: 0 };
+        dseMap[name].closed += 1;
+        dseMap[name].revenue += parseFloat(agg.model.onRoadPrice) || 0;
+    });
+    const dsePerformance = Object.values(dseMap).map(d => ({
+        ...d,
+        revenue: `₹ ${formatter.format(d.revenue || 0)}`
+    }));
+
+    // --- 0. Enhanced Floor Activity (Leads, Bookings, Sales combined) ---
+    const [recentLeads, recentBookings, recentAgreements] = await Promise.all([
+      Customer.find().sort({ createdAt: -1 }).limit(5),
+      Challan.find().sort({ createdAt: -1 }).limit(5).populate('customer'),
+      Agreement.find().sort({ createdAt: -1 }).limit(5).populate('customerId')
+    ]);
+
+    const activityFeed = [
+      ...recentLeads.map(l => ({
+        text: `Customer Created: ${l.personal.firstName} ${l.personal.lastName}`,
+        time: l.createdAt,
+        type: 'info'
+      })),
+      ...recentBookings.map(b => ({
+        text: `Challan Updated: ${b.customer?.personal.firstName || 'Customer'} ${b.customer?.personal.lastName || ''}`,
+        time: b.createdAt,
+        type: 'warning'
+      })),
+      ...recentAgreements.map(a => ({
+        text: `Agreement Created: ${a.customerId?.personal.firstName || 'Customer'} ${a.customerId?.personal.lastName || ''}`,
+        time: a.createdAt,
+        type: 'success'
+      }))
+    ].sort((a, b) => b.time - a.time).slice(0, 10).map(act => ({
+      ...act,
+      time: new Date(act.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }));
+
+    const recentActivity = activityFeed;
+
+    // --- 1. Conversion Funnel (Leads -> Bookings -> Deliveries) ---
+    const [leadsCount, bookingsCount, deliveriesCount] = await Promise.all([
+      Customer.countDocuments(),
+      Challan.countDocuments(),
+      Agreement.countDocuments()
+    ]);
+
+    const funnelData = [
+      { name: 'Total Customer', value: leadsCount, fill: '#cbd5e1' },
+      { name: 'Challan', value: bookingsCount, fill: '#94a3b8' },
+      { name: 'Agreement', value: deliveriesCount, fill: 'THEME_COLOR' }
+    ];
+
+    // --- 2. Broker Leaderboard (New: Matches Heatmap replacement) ---
+    const brokerStats = await Agreement.aggregate([
+      { $group: { _id: "$broker.name", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 7 }
+    ]);
+    const brokerData = brokerStats.map(b => ({
+      name: b._id || 'Direct',
+      count: b.count
+    }));
+
+    // --- 3. Available Stock Inventory Breakdown ---
+    const availableStockResults = await VehicleStock.aggregate([
+      { $match: { status: 'Available' } },
+      {
+        $lookup: {
+          from: 'vehiclemodels', // Check the collection name in your DB
+          localField: 'modelId',
+          foreignField: '_id',
+          as: 'model'
+        }
+      },
+      { $unwind: '$model' },
+      { $group: { _id: '$model.name', count: { $sum: 1 } } }
+    ]);
+    const availablePerModel = availableStockResults
+      .filter(r => r._id && r._id.toUpperCase() !== 'BAJAJ')
+      .map(r => ({
+        name: r._id,
+        count: r.count
+      }));
+
+    const totalAvailable = availablePerModel.reduce((acc, curr) => acc + curr.count, 0);
+
+    // --- 4. Payment Dues (Radar: Paid vs Dues) ---
+    const paymentStats = agreements.reduce((acc, curr) => {
+        acc.paid += (parseFloat(curr.payment.paidAmount) || 0);
+        acc.dues += (parseFloat(curr.payment.netDues) || 0);
+        return acc;
+    }, { paid: 0, dues: 0 });
+
+    const totalContractValue = paymentStats.paid + paymentStats.dues;
+    const duesRadar = [
+        { subject: 'Paid', A: totalContractValue > 0 ? (paymentStats.paid / totalContractValue) * 100 : 0, fullMark: 100 },
+        { subject: 'Dues', A: totalContractValue > 0 ? (paymentStats.dues / totalContractValue) * 100 : 0, fullMark: 100 },
+        { subject: 'Finance', A: 85, fullMark: 100 }, // Estimate
+        { subject: 'Margin', A: 75, fullMark: 100 }, // Estimate
+    ];
+
+    res.json({
+      kpis: [
+        { id: 'net_profit', label: 'Net Profit', value: `₹ ${formatter.format(stats.netProfit)}`, raw: stats.netProfit },
+        { id: 'ev_net_profit', label: 'EV Net Profit', value: `₹ ${formatter.format(stats.evNetProfit)}`, raw: stats.evNetProfit },
+        { id: 'bajaj_net_profit', label: 'Bajaj Net Profit', value: `₹ ${formatter.format(stats.bajajNetProfit)}`, raw: stats.bajajNetProfit },
+        { id: 'dse_comm', label: 'DSE Payouts', value: `₹ ${formatter.format(stats.dseComm)}`, raw: stats.dseComm }, 
+        { id: 'total_expenses', label: 'Total Expenses', value: `₹ ${formatter.format(totalExpenses)}`, raw: totalExpenses },
+        { id: 'dues_pending', label: 'Pending Dues', value: `₹ ${formatter.format(stats.pendingDues)}`, raw: stats.pendingDues }
+      ],
+      financialMixedData,
+      modelDistribution,
+      recentSales,
+      dsePerformance,
+      recentActivity,
+      funnelData,
+      brokerData,
+      duesRadar,
+      availablePerModel,
+      totalAvailable
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Dues & Collections Routes ---
+
+app.get('/api/dues/fix-balances', verifyToken, async (req, res) => {
+  try {
+    const agreements = await Agreement.find({});
+    for (let agg of agreements) {
+      const collections = await Collection.find({ agreementId: agg._id });
+      const totalCollected = collections.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+      const initialDues = parseFloat(agg.payment.dues) || 0;
+      const newNetDues = Math.max(0, initialDues - totalCollected);
+      
+      await Agreement.findByIdAndUpdate(agg._id, {
+        $set: { 'payment.netDues': newNetDues.toString() }
+      });
+    }
+    res.json({ message: 'All balances recalculated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/dues', verifyToken, async (req, res) => {
+  try {
+    // Find agreements where netDues > 0
+    const pendingDues = await Agreement.find({
+      $expr: { $gt: [{ $toDouble: "$payment.netDues" }, 0] }
+    }).populate('customerId').sort({ createdAt: -1 });
+
+    const formattedDues = pendingDues.map(d => ({
+      id: d.agreementId || d._id,
+      mongodbId: d._id,
+      customer: `${d.customerId?.personal.firstName} ${d.customerId?.personal.lastName}`,
+      phone: d.customerId?.personal.phone,
+      model: d.model.name,
+      totalAmount: parseFloat(d.model.onRoadPrice) || 0,
+      paidAmount: parseFloat(d.payment.paidAmount) || 0,
+      balance: parseFloat(d.payment.netDues) || 0
+    }));
+
+    res.json(formattedDues);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/dues/collect', verifyToken, async (req, res) => {
+  try {
+    const { agreementId, amount, method, date } = req.body;
+    const agreement = await Agreement.findById(agreementId);
+    if (!agreement) return res.status(404).json({ message: 'Agreement not found' });
+
+    // 1. Calculate Ledger Running Balance
+    const lastEntry = await Ledger.findOne().sort({ date: -1, createdAt: -1 });
+    const previousBalance = lastEntry ? lastEntry.balance : 0;
+    const newBalance = previousBalance + Number(amount);
+
+    // 2. Create Ledger Entry
+    const ledgerEntry = await Ledger.create({
+      date: date ? new Date(date) : Date.now(),
+      description: `Collection from Agreement ${agreement.agreementId || agreement._id}`,
+      category: 'Collection',
+      type: 'Credit',
+      amount: Number(amount),
+      balance: newBalance,
+      partyName: `${agreement.customerId?.personal?.firstName || 'Customer'} ${agreement.customerId?.personal?.lastName || ''}`.trim(),
+      paymentMethod: method || 'Cash'
+    });
+
+    // 3. Create Collection Entry
+    await Collection.create({
+      agreementId: agreement._id,
+      customerId: agreement.customerId,
+      amount: Number(amount),
+      method: method || 'Cash',
+      date: date ? new Date(date) : Date.now(),
+      ledgerId: ledgerEntry._id
+    });
+
+    // 4. Update Agreement Balance (only netDues)
+    const newDues = (parseFloat(agreement.payment.netDues) || 0) - Number(amount);
+
+    await Agreement.findByIdAndUpdate(agreementId, {
+      $set: {
+        'payment.netDues': newDues.toString()
+      }
+    });
+
+    res.json({ message: 'Payment recorded successfully', newDues });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/dues/history/:id', verifyToken, async (req, res) => {
+  try {
+    const collectionId = req.params.id;
+    const collection = await Collection.findById(collectionId);
+    
+    if (!collection) {
+      return res.status(404).json({ message: 'Collection not found' });
+    }
+
+    const agreement = await Agreement.findById(collection.agreementId);
+    if (!agreement) {
+      return res.status(404).json({ message: 'Associated agreement not found' });
+    }
+
+    // Revert Agreement Balance (only netDues)
+    const newDues = (parseFloat(agreement.payment.netDues) || 0) + collection.amount;
+
+    await Agreement.findByIdAndUpdate(agreement._id, {
+      $set: {
+        'payment.netDues': newDues.toString()
+      }
+    });
+
+    // Delete associated Ledger Entry if exists
+    if (collection.ledgerId) {
+      await Ledger.findByIdAndDelete(collection.ledgerId);
+    }
+
+    // Delete Collection
+    await Collection.findByIdAndDelete(collectionId);
+
+    res.json({ message: 'Payment deleted and balance reverted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/dues/history', verifyToken, async (req, res) => {
+  try {
+    const history = await Collection.find()
+      .sort({ date: -1 })
+      .limit(20)
+      .populate('customerId');
+
+    const formattedHistory = history.map(h => ({
+      id: h._id,
+      customer: `${h.customerId?.personal.firstName} ${h.customerId?.personal.lastName}`,
+      date: new Date(h.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+      amount: h.amount,
+      method: h.method
+    }));
+
+    res.json(formattedHistory);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Employee Routes ---
+
+app.get('/api/employees', verifyToken, async (req, res) => {
+  try {
+    const employees = await Employee.find().sort({ 'professional.joinDate': -1 });
+    res.json(employees);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/employees', verifyToken, async (req, res) => {
+  try {
+    const { personal, professional, financial } = req.body;
+    
+    // Auto-generate Employee ID
+    const count = await Employee.countDocuments();
+    const year = new Date().getFullYear();
+    const employeeId = `EMP-${year}-${(count + 1).toString().padStart(3, '0')}`;
+
+    const newEmployee = await Employee.create({
+      personal,
+      professional: { ...professional, employeeId },
+      financial
+    });
+
+    res.status(201).json(newEmployee);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/employees/:id', verifyToken, async (req, res) => {
+  try {
+    const { personal, professional, financial } = req.body;
+    const updatedEmployee = await Employee.findByIdAndUpdate(
+      req.params.id,
+      { personal, professional, financial },
+      { new: true }
+    );
+    if (!updatedEmployee) return res.status(404).json({ message: 'Employee not found' });
+    res.json(updatedEmployee);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/employees/:id', verifyToken, async (req, res) => {
+  try {
+    const employee = await Employee.findByIdAndDelete(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    
+    // Also cleanup any salary records
+    await SalaryRecord.deleteMany({ employeeId: req.params.id });
+    
+    res.json({ message: 'Employee and their payroll history deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Process Payroll (Monthly Salary Record)
+app.post('/api/employees/:id/payroll', verifyToken, async (req, res) => {
+  try {
+    const { month, year, baseSalary, allowance, incentives, tax, otherAmount, remark, totalPayable, payableDays, totalDaysInMonth, selectedDates } = req.body;
+    
+    // Check if duplicate for the same month/year
+    const existing = await SalaryRecord.findOne({ employeeId: req.params.id, month, year });
+    if (existing) return res.status(400).json({ message: 'Payroll for this month/year already processed.' });
+
+    const record = await SalaryRecord.create({
+      employeeId: req.params.id,
+      month,
+      year,
+      baseSalary,
+      allowance,
+      incentives,
+      tax,
+      otherAmount,
+      remark,
+      totalPayable,
+      payableDays,
+      totalDaysInMonth,
+      selectedDates,
+      status: 'Paid'
+    });
+    
+    // Auto-generate Expense Entry for Payroll
+    const emp = await Employee.findById(req.params.id);
+    const empName = emp ? `${emp.personal.firstName} ${emp.personal.lastName}` : 'Staff';
+    
+    const count = await Expense.countDocuments();
+    const expenseId = `EXP-${(count + 1).toString().padStart(3, '0')}`;
+    
+    await Expense.create({
+        id: expenseId,
+        category: 'Salary',
+        description: `Staff Payroll: ${empName} (${month} ${year})`,
+        amount: totalPayable,
+        date: new Date().getDate(),
+        month,
+        year,
+        status: 'Processed',
+        type: 'Payroll'
+    });
+
+    res.status(201).json(record);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete Salary Record (Void Payroll)
+app.delete('/api/employees/:id/payroll/:recordId', verifyToken, async (req, res) => {
+  try {
+    const record = await SalaryRecord.findById(req.params.recordId);
+    if (!record) return res.status(404).json({ message: 'Salary record not found' });
+
+    // 1. Find and Delete associated Expense
+    const emp = await Employee.findById(req.params.id);
+    if (emp) {
+        const empName = `${emp.personal.firstName} ${emp.personal.lastName}`;
+        const description = `Staff Payroll: ${empName} (${record.month} ${record.year})`;
+        await Expense.findOneAndDelete({ 
+            category: 'Salary', 
+            type: 'Payroll', 
+            description,
+            month: record.month,
+            year: record.year
+        });
+    }
+
+    // 2. Delete the Salary Record
+    await SalaryRecord.findByIdAndDelete(req.params.recordId);
+
+    res.json({ message: 'Payroll record voided and expense removed.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/employees/:id/payroll', verifyToken, async (req, res) => {
+  try {
+    const history = await SalaryRecord.find({ employeeId: req.params.id }).sort({ year: -1, createdAt: -1 });
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Serve React frontend (production/local fallback) ---
+app.use(express.static(frontendPath));
+
+// 9. EXPENSE ROUTES
+app.get('/api/expenses', verifyToken, async (req, res) => {
+  try {
+    const { month, year } = req.query;
+    const filter = {};
+    if (month) filter.month = month;
+    if (year) filter.year = Number(year);
+    
+    // Self-Healing: Backfill missing payroll expenses for the filtered period
+    if (month && year) {
+        const salaries = await SalaryRecord.find({ month, year: Number(year) });
+        for (const sal of salaries) {
+            // Check if expense exists for this specific salary record
+            const emp = await Employee.findById(sal.employeeId);
+            const empName = emp ? `${emp.personal.firstName} ${emp.personal.lastName}` : 'Staff';
+            const description = `Staff Payroll: ${empName} (${month} ${year})`;
+            
+            const existingExpense = await Expense.findOne({ 
+                category: 'Salary', 
+                type: 'Payroll', 
+                description,
+                month,
+                year: Number(year)
+            });
+            
+            if (!existingExpense) {
+                const count = await Expense.countDocuments();
+                await Expense.create({
+                    id: `EXP-${(count + 1).toString().padStart(3, '0')}`,
+                    category: 'Salary',
+                    description,
+                    amount: sal.totalPayable,
+                    date: 1, // Use 1st of month for historical backfills 
+                    month,
+                    year: Number(year),
+                    status: 'Processed',
+                    type: 'Payroll'
+                });
+            }
+        }
+    }
+
+    const expenses = await Expense.find(filter).sort({ createdAt: -1 });
+    res.json(expenses);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/expenses', verifyToken, async (req, res) => {
+  try {
+    const { category, description, amount, date, month, year } = req.body;
+    
+    const count = await Expense.countDocuments();
+    const expenseId = `EXP-${(count + 1).toString().padStart(3, '0')}`;
+
+    const newExpense = await Expense.create({
+      id: expenseId,
+      category,
+      description,
+      amount: Number(amount),
+      date: Number(date) || new Date().getDate(),
+      month,
+      year,
+      status: 'Paid',
+      type: 'Manual'
+    });
+    
+    res.status(201).json(newExpense);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
+  try {
+    const expense = await Expense.findById(req.params.id);
+    if (!expense) return res.status(404).json({ message: 'Expense not found' });
+    
+    if (expense.type === 'Payroll') {
+        return res.status(403).json({ message: 'Automated payroll expenses cannot be deleted manually.' });
+    }
+    
+    await Expense.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Expense deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- LEDGER ROUTES ---
+app.get('/api/ledger', verifyToken, async (req, res) => {
+  try {
+    const ledger = await Ledger.find().sort({ date: -1, createdAt: -1 });
+    res.json(ledger);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/ledger', verifyToken, async (req, res) => {
+  try {
+    const { date, description, category, type, amount, partyName, paymentMethod } = req.body;
+    
+    // Calculate running balance based on the most recent entry
+    const lastEntry = await Ledger.findOne().sort({ date: -1, createdAt: -1 });
+    let previousBalance = lastEntry ? lastEntry.balance : 0;
+    
+    let newBalance = previousBalance;
+    if (type === 'Credit') newBalance += Number(amount);
+    if (type === 'Debit') newBalance -= Number(amount);
+    
+    const entry = await Ledger.create({
+      date,
+      description,
+      category: category || 'General',
+      type,
+      amount: Number(amount),
+      balance: newBalance,
+      partyName: partyName || '',
+      paymentMethod: paymentMethod || 'Cash'
+    });
+    res.status(201).json(entry);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/ledger/:id', verifyToken, async (req, res) => {
+  try {
+    await Ledger.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Ledger entry deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// SPARE STOCK ROUTES
+// ==========================================
+
+// --- SPARE CATEGORIES ---
+app.get('/api/spare-categories', verifyToken, async (req, res) => {
+  try {
+    const categories = await SpareCategory.find().sort({ name: 1 }).lean();
+    const categoriesWithCount = await Promise.all(categories.map(async (cat) => {
+      const count = await SpareStock.countDocuments({ categoryId: cat._id, status: 'Available' });
+      return { ...cat, stockCount: count };
+    }));
+    res.json(categoriesWithCount);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/spare-categories', verifyToken, async (req, res) => {
+  try {
+    const category = new SpareCategory(req.body);
+    await category.save();
+    res.status(201).json(category);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/spare-categories/:id', verifyToken, async (req, res) => {
+  try {
+    const updated = await SpareCategory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spare-categories/:id', verifyToken, async (req, res) => {
+  try {
+    const stockCount = await SpareStock.countDocuments({ categoryId: req.params.id });
+    if (stockCount > 0) {
+      return res.status(400).json({ message: `Cannot delete category. ${stockCount} items still in stock.` });
+    }
+    await SpareCategory.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Category deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SPARE STOCKS ---
+app.get('/api/spare-stocks/:categoryId', verifyToken, async (req, res) => {
+  try {
+    const stocks = await SpareStock.find({ categoryId: req.params.categoryId }).sort({ createdAt: -1 });
+    res.json(stocks);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/spare-stocks', verifyToken, async (req, res) => {
+  try {
+    const stock = new SpareStock(req.body);
+    await stock.save();
+    res.status(201).json(stock);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/spare-stocks/:id', verifyToken, async (req, res) => {
+  try {
+    const updated = await SpareStock.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json(updated);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spare-stocks/:id', verifyToken, async (req, res) => {
+  try {
+    await SpareStock.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Spare stock deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Restock: Add quantity to an existing spare item
+app.patch('/api/spare-stocks/:id/restock', verifyToken, async (req, res) => {
+  try {
+    const { qty } = req.body;
+    if (!qty || qty <= 0) return res.status(400).json({ error: 'Quantity must be greater than 0' });
+    
+    const stock = await SpareStock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ error: 'Stock item not found' });
+    
+    stock.qty = (stock.qty || 0) + Number(qty);
+    stock.status = 'Available';
+    await stock.save();
+    
+    res.json(stock);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Manual Stock Out: Mark item as out of stock manually (for tangible items like grease)
+app.patch('/api/spare-stocks/:id/manual-stock-out', verifyToken, async (req, res) => {
+  try {
+    const stock = await SpareStock.findById(req.params.id);
+    if (!stock) return res.status(404).json({ error: 'Stock item not found' });
+    
+    stock.qty = 0;
+    stock.status = 'Out of Stock';
+    await stock.save();
+    
+    res.json(stock);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SPARE BILLS ---
+app.get('/api/spare-bills', verifyToken, async (req, res) => {
+  try {
+    const bills = await SpareBill.find().sort({ createdAt: -1 });
+    res.json(bills);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/spare-bills', verifyToken, async (req, res) => {
+  try {
+    const { customerName, customerPhone, items, paymentMethod, totalAmount, labourCharge, labourRemark, labourList, createdAt } = req.body;
+
+    if (!customerName || !items || items.length === 0 || !totalAmount) {
+      return res.status(400).json({ error: 'Missing required bill fields' });
+    }
+
+    const bill = new SpareBill({
+      customerName,
+      customerPhone,
+      items,
+      totalAmount,
+      labourCharge: Number(labourCharge) || 0,
+      labourRemark: labourRemark || '',
+      labourList: labourList || [],
+      paymentMethod: paymentMethod || 'Cash',
+      createdAt: createdAt ? new Date(createdAt) : Date.now()
+    });
+    await bill.save();
+
+    // Decrement stock for each item
+    for (const item of items) {
+      await SpareStock.findByIdAndUpdate(item.stockId, {
+        $inc: { qty: -item.qty }
+      });
+    }
+
+    res.status(201).json(bill);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/spare-bills/:id', verifyToken, async (req, res) => {
+  try {
+    const bill = await SpareBill.findById(req.params.id);
+    if (!bill) return res.status(404).json({ message: 'Bill not found' });
+
+    // Restore stock for each item
+    for (const item of bill.items) {
+      await SpareStock.findByIdAndUpdate(item.stockId, {
+        $inc: { qty: item.qty }
+      });
+    }
+
+    await SpareBill.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Bill deleted and stock restored' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- SPARE ANALYTICS ---
+app.get('/api/spare-analytics', verifyToken, async (req, res) => {
+  try {
+    const { period, month } = req.query;
+    let billQuery = {};
+    const now = new Date();
+
+    if (period === 'this_month') {
+        const start = new Date(now.getFullYear(), now.getMonth(), 1);
+        billQuery.createdAt = { $gte: start };
+    } else if (period === 'last_month') {
+        const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+        billQuery.createdAt = { $gte: start, $lte: end };
+    } else if (period === 'custom' && month) {
+        const [year, m] = month.split('-');
+        const start = new Date(year, parseInt(m) - 1, 1);
+        const end = new Date(year, parseInt(m), 0, 23, 59, 59, 999);
+        billQuery.createdAt = { $gte: start, $lte: end };
+    }
+
+    const bills = await SpareBill.find(billQuery).sort({ createdAt: -1 });
+    const stocks = await SpareStock.find();
+    const categories = await SpareCategory.find();
+
+    // Total revenue from all bills
+    const totalRevenue = bills.reduce((sum, b) => sum + b.totalAmount, 0);
+    const totalLabourRevenue = bills.reduce((sum, b) => {
+        const legacyLabour = b.labourCharge || 0;
+        const listLabour = (b.labourList || []).reduce((s, l) => s + (l.amount || 0), 0);
+        return sum + legacyLabour + listLabour;
+    }, 0);
+    
+    // Cost calculation: for each bill item, find the stock's purchaseRate
+    const stockMap = {};
+    stocks.forEach(s => { stockMap[s._id.toString()] = s; });
+    
+    let totalCost = 0;
+    let totalItemsSold = 0;
+    bills.forEach(b => {
+      b.items.forEach(item => {
+        const stock = stockMap[item.stockId?.toString()];
+        const purchaseRate = stock ? stock.purchaseRate : 0;
+        totalCost += purchaseRate * item.qty;
+        totalItemsSold += item.qty;
+      });
+    });
+
+    const totalProfit = totalRevenue - totalCost;
+
+    // Monthly revenue & profit (last 6 months)
+    const monthlyData = {};
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      monthlyData[key] = { name: key, revenue: 0, cost: 0, profit: 0, bills: 0 };
+    }
+    
+    bills.forEach(b => {
+      const d = new Date(b.createdAt);
+      const key = d.toLocaleString('default', { month: 'short', year: '2-digit' });
+      if (monthlyData[key]) {
+        monthlyData[key].revenue += b.totalAmount;
+        monthlyData[key].bills += 1;
+        b.items.forEach(item => {
+          const stock = stockMap[item.stockId?.toString()];
+          const purchaseRate = stock ? stock.purchaseRate : 0;
+          monthlyData[key].cost += purchaseRate * item.qty;
+        });
+        monthlyData[key].profit = monthlyData[key].revenue - monthlyData[key].cost;
+      }
+    });
+
+    // Payment method distribution
+    const paymentDist = {};
+    bills.forEach(b => {
+      paymentDist[b.paymentMethod] = (paymentDist[b.paymentMethod] || 0) + 1;
+    });
+
+    // Top selling items
+    const itemSales = {};
+    bills.forEach(b => {
+      b.items.forEach(item => {
+        if (!itemSales[item.name]) {
+          itemSales[item.name] = { name: item.name, qtySold: 0, revenue: 0 };
+        }
+        itemSales[item.name].qtySold += item.qty;
+        itemSales[item.name].revenue += item.qty * item.sellingPrice;
+      });
+    });
+    const topItems = Object.values(itemSales).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+
+    // Category distribution
+    const categoryMap = {};
+    categories.forEach(c => { categoryMap[c._id.toString()] = c.name; });
+    const categoryDist = {};
+    stocks.forEach(s => {
+      const catName = categoryMap[s.categoryId?.toString()] || 'Uncategorized';
+      if (!categoryDist[catName]) categoryDist[catName] = { name: catName, value: 0, stockValue: 0 };
+      categoryDist[catName].value += s.qty;
+      categoryDist[catName].stockValue += s.qty * s.purchaseRate;
+    });
+
+    // Stock value (inventory worth)
+    const totalStockValue = stocks.reduce((sum, s) => sum + (s.qty * s.purchaseRate), 0);
+    const totalStockQty = stocks.reduce((sum, s) => sum + s.qty, 0);
+    const outOfStockCount = stocks.filter(s => s.qty === 0 || s.status === 'Out of Stock').length;
+
+    // Recent bills (last 10)
+    const recentBills = bills.slice(0, 10).map(b => ({
+      id: b._id.toString().slice(-6).toUpperCase(),
+      customer: b.customerName,
+      phone: b.customerPhone || '',
+      items: b.items.map(i => `${i.qty}x ${i.name}`).join(', '),
+      total: b.totalAmount,
+      payment: b.paymentMethod,
+      date: new Date(b.createdAt).toLocaleDateString()
+    }));
+
+    // Top customers
+    const customerSpend = {};
+    bills.forEach(b => {
+      if (!customerSpend[b.customerName]) customerSpend[b.customerName] = { name: b.customerName, total: 0, count: 0 };
+      customerSpend[b.customerName].total += b.totalAmount;
+      customerSpend[b.customerName].count += 1;
+    });
+    const topCustomers = Object.values(customerSpend).sort((a, b) => b.total - a.total).slice(0, 5);
+
+    res.json({
+      kpis: {
+        totalRevenue,
+        totalCost,
+        totalProfit,
+        totalLabourRevenue,
+        totalBills: bills.length,
+        totalItemsSold,
+        totalStockValue,
+        totalStockQty,
+        outOfStockCount
+      },
+      monthlyData: Object.values(monthlyData),
+      paymentDistribution: Object.entries(paymentDist).map(([name, value]) => ({ name, value })),
+      topItems,
+      categoryDistribution: Object.values(categoryDist),
+      recentBills,
+      topCustomers
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Catch-all: serve index.html for all non-API routes (React Router support)
+// Fixed for Express 5: using app.use instead of app.get('*') to avoid PathError
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ error: 'API route not found' });
+  }
+  res.sendFile(path.join(frontendPath, 'index.html'), err => {
+    if (err) res.status(404).send('Frontend not built or missing.');
+  });
+});
+
+
+
+// Start server only when run directly (not as a serverless function)
+
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`🚀 Server on port ${PORT}`));
+}
+
+// Global Error Handler for debugging Serverless environment
+app.use((err, req, res, next) => {
+  console.error("Express Error:", err);
+  res.status(500).json({
+    error: 'Global Error Handler',
+    message: err.message || 'Unknown Error',
+    stack: err.stack
+  });
+});
+
+module.exports = app;
