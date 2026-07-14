@@ -762,7 +762,11 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         let onRoadPrice, netProfit, magadhMargin;
 
         // 1. Magadh Margin (Auto)
-        const magadhMarginVal = exShowroom + insurance + bankFee - loanAmt;
+        // For Bajaj (NORMAL): (Ex-Showroom + RTO + Insurance + Permit + BPF) - Loan Amt - Discount
+        // For EV (TYPE2): same formula but without subtracting discount
+        const magadhMarginVal = formData.agreementType === 'TYPE2'
+            ? (exShowroom + rto + insurance + permit + bankFee - loanAmt)
+            : (exShowroom + rto + insurance + permit + bankFee - loanAmt - discount);
         magadhMargin = magadhMarginVal.toFixed(2);
 
         // 2. DTO Total
@@ -795,7 +799,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
         const finalNetProfit = (safe(netProfit) - safe(tds)).toFixed(2);
         
         // Calculate Collections Made (Initial Dues - Initial Net Dues)
-        const collectionsMade = initialData ? (safe(initialData.payment.dues) - safe(initialData.payment.netDues)) : 0;
+        const collectionsMade = initialData ? (safe(initialData?.payment?.dues) - safe(initialData?.payment?.netDues)) : 0;
         const newNetDues = Math.max(0, safe(dues) - collectionsMade).toFixed(2);
 
         // Update State

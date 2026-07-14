@@ -13,7 +13,7 @@ const SpareBilling = ({ theme: t }) => {
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    
+
     // Filters
     const [showFilters, setShowFilters] = useState(false);
     const [filterFromDate, setFilterFromDate] = useState('');
@@ -26,25 +26,24 @@ const SpareBilling = ({ theme: t }) => {
     const [viewPdfDataUrl, setViewPdfDataUrl] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
-    
+
     // Labour for new bill
     const [labourList, setLabourList] = useState([]);
     const [labourAmount, setLabourAmount] = useState('');
     const [labourRemark, setLabourRemark] = useState('');
-    
+
     // Items for the new bill
     const [billItems, setBillItems] = useState([]);
-    
+
     // Available spares to select from
     const [availableCategories, setAvailableCategories] = useState([]);
     const [availableSpares, setAvailableSpares] = useState([]);
-    
+
     // Current item being added to bill
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedSpareId, setSelectedSpareId] = useState('');
     const [selectedSpareQty, setSelectedSpareQty] = useState(1);
     const [selectedSparePrice, setSelectedSparePrice] = useState(0);
-    const [selectedSpareMarkStockOut, setSelectedSpareMarkStockOut] = useState(false);
 
     const [submitting, setSubmitting] = useState(false);
 
@@ -65,10 +64,10 @@ const SpareBilling = ({ theme: t }) => {
         try {
             const res = await axios.get(`${API_URL}/spare-bills`, getAuthHeader());
             setBills(res.data);
-        } catch (err) { 
-            console.error("Error fetching bills", err); 
-        } finally { 
-            setLoading(false); 
+        } catch (err) {
+            console.error("Error fetching bills", err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -87,7 +86,7 @@ const SpareBilling = ({ theme: t }) => {
             // Only show spares that have quantity > 0
             const inStock = res.data.filter(s => s.qty > 0 && s.status === 'Available');
             setAvailableSpares(inStock);
-            
+
             if (inStock.length > 0) {
                 setSelectedSpareId(inStock[0]._id);
                 setSelectedSparePrice('');
@@ -129,7 +128,7 @@ const SpareBilling = ({ theme: t }) => {
     const handleAddItemToBill = () => {
         if (!selectedSpareId) return alert("Please select a spare item.");
         if (selectedSpareQty <= 0) return alert("Quantity must be at least 1.");
-        
+
         const spare = availableSpares.find(s => s._id === selectedSpareId);
         if (!spare) return;
 
@@ -138,11 +137,10 @@ const SpareBilling = ({ theme: t }) => {
         }
 
         // Check if already in bill
-        const existingItemIndex = billItems.findIndex(item => item.stockId === spare._id && (item.discount || 0) === (Number(selectedSpareDiscount) || 0) && !!item.markStockOut === !!selectedSpareMarkStockOut);
+        const existingItemIndex = billItems.findIndex(item => item.stockId === spare._id && (item.discount || 0) === (Number(selectedSpareDiscount) || 0));
         if (existingItemIndex >= 0) {
             const updatedItems = [...billItems];
             updatedItems[existingItemIndex].qty += Number(selectedSpareQty);
-            updatedItems[existingItemIndex].markStockOut = selectedSpareMarkStockOut || updatedItems[existingItemIndex].markStockOut;
             setBillItems(updatedItems);
         } else {
             setBillItems([
@@ -152,8 +150,7 @@ const SpareBilling = ({ theme: t }) => {
                     name: spare.name,
                     qty: Number(selectedSpareQty),
                     sellingPrice: Number(selectedSparePrice),
-                    discount: Number(selectedSpareDiscount) || 0,
-                    markStockOut: selectedSpareMarkStockOut
+                    discount: Number(selectedSpareDiscount) || 0
                 }
             ]);
         }
@@ -161,7 +158,6 @@ const SpareBilling = ({ theme: t }) => {
         // Reset selection inputs
         setSelectedSpareQty(1);
         setSelectedSpareDiscount('');
-        setSelectedSpareMarkStockOut(false);
     };
 
     const handleRemoveItemFromBill = (index) => {
@@ -174,10 +170,10 @@ const SpareBilling = ({ theme: t }) => {
         if (!customerName.trim()) return alert("Customer Name is required.");
         if (billItems.length === 0) return alert("Please add at least one item to the bill.");
 
-        const itemsTotal = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice * (1 - (item.discount || 0)/100)), 0);
+        const itemsTotal = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice * (1 - (item.discount || 0) / 100)), 0);
         let labourTotal = 0;
         if (!(isFreeService && serviceNumber)) {
-            labourTotal = labourList.reduce((sum, l) => sum + ((Number(l.amount) || 0) * (1 - (l.discount || 0)/100)), 0);
+            labourTotal = labourList.reduce((sum, l) => sum + ((Number(l.amount) || 0) * (1 - (l.discount || 0) / 100)), 0);
         }
         const totalAmount = itemsTotal + labourTotal;
 
@@ -197,7 +193,7 @@ const SpareBilling = ({ theme: t }) => {
             };
 
             await axios.post(`${API_URL}/spare-bills`, payload, getAuthHeader());
-            
+
             // Reset form
             setCustomerName('');
             setCustomerPhone('');
@@ -213,7 +209,7 @@ const SpareBilling = ({ theme: t }) => {
             setBillItems([]);
             setSelectedCategory('');
             setSelectedSpareDiscount('');
-            
+
             // Return to dashboard and refresh
             setViewMode('dashboard');
             fetchBills();
@@ -238,21 +234,21 @@ const SpareBilling = ({ theme: t }) => {
 
     const generatePdf = (bill) => {
         const doc = new jsPDF();
-        
+
         // Colors
         const primaryColor = [252, 193, 22]; // Yellow theme
         const darkText = [30, 41, 59];
         const lightText = [100, 116, 139];
-        
+
         // --- HEADER ---
         // Yellow rectangle top right
         doc.setFillColor(...primaryColor);
         doc.rect(130, 15, 80, 18, 'F');
-        
+
         doc.setFontSize(26);
         doc.setTextColor(255, 255, 255);
         doc.text("INVOICE", 145, 28); // Shifted text slightly right
-        
+
         // Brand Name (Left)
         doc.setFontSize(18); // Reduced to prevent overlap
         doc.setFont('helvetica', 'bold');
@@ -262,14 +258,14 @@ const SpareBilling = ({ theme: t }) => {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...lightText);
         doc.text("Authorised Spare Parts Dealer", 14, 31);
-        
+
         // --- INVOICE INFO ---
         // Left - Customer Info
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...darkText);
         doc.text("Invoice to:", 14, 50);
-        
+
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text(bill.customerName, 14, 56);
@@ -281,24 +277,24 @@ const SpareBilling = ({ theme: t }) => {
         if (bill.customerVillage) {
             doc.text(`Village: ${bill.customerVillage}`, 14, yOffset);
         }
-        
+
         // Right - Invoice Details
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text("Invoice#", 130, 50);
         doc.text("Date", 130, 56);
-        
+
         doc.setFont('helvetica', 'normal');
         const shortId = bill._id.substring(bill._id.length - 6).toUpperCase();
         doc.text(shortId, 160, 50);
         doc.text(new Date(bill.createdAt).toLocaleDateString(), 160, 56);
-        
+
         // --- TABLE ---
         const tableColumn = ["SL.", "Item Description", "Price", "Qty.", "Total"];
         const tableRows = [];
-        
+
         let subTotal = 0;
-        
+
         bill.items.forEach((item, index) => {
             const itemDiscount = item.discount || 0;
             const discountedPrice = item.sellingPrice * (1 - itemDiscount / 100);
@@ -314,7 +310,7 @@ const SpareBilling = ({ theme: t }) => {
                 `Rs. ${rowTotal.toLocaleString()}`
             ]);
         });
-        
+
         let labourIndex = bill.items.length + 1;
         const freeServiceMode = bill.isFreeService && bill.serviceNumber;
         if (bill.labourCharge > 0) {
@@ -348,7 +344,7 @@ const SpareBilling = ({ theme: t }) => {
                 ]);
             });
         }
-        
+
         autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
@@ -366,52 +362,52 @@ const SpareBilling = ({ theme: t }) => {
                 4: { cellWidth: 35, halign: 'right' }
             }
         });
-        
+
         const finalY = doc.lastAutoTable.finalY || 70;
-        
+
         // --- BOTTOM TOTALS ---
         const rightColX = 130;
-        
+
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text("Sub Total:", rightColX, finalY + 15);
-        
+
         doc.setFont('helvetica', 'normal');
         doc.text(`Rs. ${subTotal.toLocaleString()}`, 160, finalY + 15);
-        
+
         // Yellow Total Box
         doc.setFillColor(...primaryColor);
         doc.rect(rightColX - 5, finalY + 22, 85, 12, 'F');
-        
+
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(255, 255, 255);
         doc.text("Total:", rightColX, finalY + 30);
         doc.text(`Rs. ${bill.totalAmount.toLocaleString()}`, 160, finalY + 30);
-        
+
         // --- BOTTOM LEFT DETAILS ---
         doc.setTextColor(...darkText);
         doc.setFontSize(10);
         doc.text("Thank you for your business!", 14, finalY + 15);
-        
+
         doc.setFontSize(9);
         doc.text("Payment Info:", 14, finalY + 28);
         doc.setFont('helvetica', 'normal');
         doc.text(`Method: ${bill.paymentMethod}`, 14, finalY + 34);
-        
+
         // --- FOOTER ---
         const pageHeight = doc.internal.pageSize.getHeight();
-        
+
         // Yellow line
         doc.setDrawColor(...primaryColor);
         doc.setLineWidth(1);
         doc.line(14, pageHeight - 30, 196, pageHeight - 30);
-        
+
         doc.setFontSize(9);
         doc.setTextColor(...lightText);
         doc.text("Authorised Sign", 160, pageHeight - 20);
         doc.text("Shivansh Auto Enterprises | Thank you", 14, pageHeight - 20);
-        
+
         // Save
         return doc;
     };
@@ -429,14 +425,14 @@ const SpareBilling = ({ theme: t }) => {
 
     // --- RENDER HELPERS ---
     const filteredBills = bills.filter(bill => {
-        const matchSearch = bill.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            (bill.customerPhone && bill.customerPhone.includes(searchTerm));
-        
+        const matchSearch = bill.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (bill.customerPhone && bill.customerPhone.includes(searchTerm));
+
         let matchDate = true;
         if (filterFromDate || filterToDate) {
             const billDate = new Date(bill.createdAt);
             billDate.setHours(0, 0, 0, 0);
-            
+
             if (filterFromDate) {
                 const from = new Date(filterFromDate);
                 from.setHours(0, 0, 0, 0);
@@ -453,7 +449,7 @@ const SpareBilling = ({ theme: t }) => {
 
     const handleExportExcel = () => {
         if (filteredBills.length === 0) return alert("No bills to export.");
-        
+
         const data = filteredBills.map(bill => {
             const listLabourSum = (bill.labourList || []).reduce((s, l) => s + l.amount, 0);
             const listLabourRemark = (bill.labourList || []).map(l => `${l.remark} (${l.amount})`).join(', ');
@@ -468,18 +464,18 @@ const SpareBilling = ({ theme: t }) => {
                 "Labour Remark": [bill.labourRemark, listLabourRemark].filter(Boolean).join(' | ')
             };
         });
-        
+
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Spare_Bills");
         XLSX.writeFile(workbook, `Spare_Bills_${new Date().toLocaleDateString().replace(/\//g, '-')}.xlsx`);
     };
 
-    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice * (1 - (item.discount || 0)/100)), 0) + ((isFreeService && serviceNumber) ? 0 : labourList.reduce((sum, l) => sum + ((Number(l.amount) || 0) * (1 - (l.discount || 0)/100)), 0));
+    const totalBillAmount = billItems.reduce((sum, item) => sum + (item.qty * item.sellingPrice * (1 - (item.discount || 0) / 100)), 0) + ((isFreeService && serviceNumber) ? 0 : labourList.reduce((sum, l) => sum + ((Number(l.amount) || 0) * (1 - (l.discount || 0) / 100)), 0));
 
     return (
         <div className="w-full min-h-screen bg-slate-50 p-6 flex flex-col font-sans text-slate-800">
-            
+
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <div>
@@ -489,34 +485,34 @@ const SpareBilling = ({ theme: t }) => {
                     </h1>
                     <p className="text-sm text-slate-500 font-medium mt-1">Manage outbound stock and customer bills for spare parts.</p>
                 </div>
-                
+
                 {viewMode === 'dashboard' ? (
                     <div className="flex gap-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 placeholder="Search Customer..."
                                 className="h-10 pl-9 pr-4 rounded-xl bg-white border border-slate-200 text-sm font-bold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 lg:w-64 shadow-sm"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <button 
+                        <button
                             onClick={() => setShowFilters(!showFilters)}
                             className={`h-10 px-4 rounded-xl text-sm font-bold uppercase tracking-widest transition-all flex items-center gap-2 border ${showFilters ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                             title="Filter by Date"
                         >
                             <Filter size={16} /> <span className="hidden lg:inline">Filter</span>
                         </button>
-                        <button 
+                        <button
                             onClick={handleExportExcel}
                             className="h-10 px-4 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-xl text-sm font-bold uppercase tracking-widest hover:bg-emerald-100 transition-all flex items-center gap-2"
                             title="Download Excel"
                         >
                             <Download size={16} /> <span className="hidden lg:inline">Export</span>
                         </button>
-                        <button 
+                        <button
                             onClick={() => setViewMode('new_bill')}
                             className={`h-10 px-5 ${t.primary} text-white rounded-xl text-sm font-bold uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:opacity-90 transition-all flex items-center gap-2`}
                         >
@@ -524,7 +520,7 @@ const SpareBilling = ({ theme: t }) => {
                         </button>
                     </div>
                 ) : (
-                    <button 
+                    <button
                         onClick={() => setViewMode('dashboard')}
                         className="h-10 px-5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold uppercase tracking-widest shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-all flex items-center gap-2"
                     >
@@ -538,8 +534,8 @@ const SpareBilling = ({ theme: t }) => {
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 flex gap-4 items-end animate-in slide-in-from-top-2">
                     <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">From Date</label>
-                        <input 
-                            type="date" 
+                        <input
+                            type="date"
                             value={filterFromDate}
                             onChange={(e) => setFilterFromDate(e.target.value)}
                             className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
@@ -547,14 +543,14 @@ const SpareBilling = ({ theme: t }) => {
                     </div>
                     <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">To Date</label>
-                        <input 
-                            type="date" 
+                        <input
+                            type="date"
                             value={filterToDate}
                             onChange={(e) => setFilterToDate(e.target.value)}
                             className="h-10 px-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-800 outline-none focus:border-blue-500"
                         />
                     </div>
-                    <button 
+                    <button
                         onClick={() => { setFilterFromDate(''); setFilterToDate(''); }}
                         className="h-10 px-4 text-slate-500 hover:text-red-500 text-xs font-bold uppercase tracking-wider transition-colors"
                     >
@@ -568,7 +564,7 @@ const SpareBilling = ({ theme: t }) => {
                 <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/40 border border-slate-200 overflow-hidden flex-1">
                     {filteredBills.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-slate-400 p-12">
-                            <Receipt size={48} className="mb-4 opacity-30"/>
+                            <Receipt size={48} className="mb-4 opacity-30" />
                             <h3 className="text-lg font-black uppercase text-slate-500 mb-1">No Bills Found</h3>
                             <p className="text-sm font-medium">Create a new bill to see it here.</p>
                         </div>
@@ -635,12 +631,11 @@ const SpareBilling = ({ theme: t }) => {
                                                 </div>
                                             </td>
                                             <td className="py-4 px-6">
-                                                <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                                                    bill.paymentMethod === 'Cash' ? 'bg-emerald-100 text-emerald-700' :
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${bill.paymentMethod === 'Cash' ? 'bg-emerald-100 text-emerald-700' :
                                                     bill.paymentMethod === 'UPI' ? 'bg-blue-100 text-blue-700' :
-                                                    bill.paymentMethod === 'Bank Transfer' ? 'bg-purple-100 text-purple-700' :
-                                                    'bg-slate-100 text-slate-700'
-                                                }`}>
+                                                        bill.paymentMethod === 'Bank Transfer' ? 'bg-purple-100 text-purple-700' :
+                                                            'bg-slate-100 text-slate-700'
+                                                    }`}>
                                                     {bill.paymentMethod}
                                                 </span>
                                             </td>
@@ -649,21 +644,21 @@ const SpareBilling = ({ theme: t }) => {
                                             </td>
                                             <td className="py-4 px-6 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleViewBill(bill)}
                                                         className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                                         title="View PDF"
                                                     >
                                                         <Eye size={16} />
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handlePrintBill(bill)}
                                                         className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                                         title="Download PDF"
                                                     >
                                                         <Printer size={16} />
                                                     </button>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleDeleteBill(bill._id)}
                                                         className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                                         title="Delete Bill & Restore Stock"
@@ -689,13 +684,13 @@ const SpareBilling = ({ theme: t }) => {
                         {/* Customer Info Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2">
-                                <User size={16}/> Customer Information
+                                <User size={16} /> Customer Information
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Customer Name *</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         value={customerName}
                                         onChange={(e) => setCustomerName(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
@@ -704,8 +699,8 @@ const SpareBilling = ({ theme: t }) => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Phone Number</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         value={customerPhone}
                                         onChange={(e) => setCustomerPhone(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
@@ -714,8 +709,8 @@ const SpareBilling = ({ theme: t }) => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Village</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         value={customerVillage}
                                         onChange={(e) => setCustomerVillage(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
@@ -724,8 +719,8 @@ const SpareBilling = ({ theme: t }) => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Bill Date</label>
-                                    <input 
-                                        type="date" 
+                                    <input
+                                        type="date"
                                         value={billDate}
                                         onChange={(e) => setBillDate(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
@@ -737,13 +732,13 @@ const SpareBilling = ({ theme: t }) => {
                                         Free Service
                                     </label>
                                     {isFreeService && (
-                                        <select 
-                                            value={serviceNumber} 
+                                        <select
+                                            value={serviceNumber}
                                             onChange={(e) => setServiceNumber(e.target.value)}
                                             className="h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 outline-none bg-white flex-1"
                                         >
                                             <option value="">-- Select Service No. --</option>
-                                            {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Service {n}</option>)}
+                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>Service {n}</option>)}
                                         </select>
                                     )}
                                 </div>
@@ -753,14 +748,14 @@ const SpareBilling = ({ theme: t }) => {
                         {/* Add Items Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-visible">
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2">
-                                <Layers size={16}/> Add Spares to Bill
+                                <Layers size={16} /> Add Spares to Bill
                             </h3>
-                            
+
                             <div className="flex flex-col gap-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Category</label>
-                                        <select 
+                                        <select
                                             value={selectedCategory}
                                             onChange={(e) => setSelectedCategory(e.target.value)}
                                             className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:border-blue-500 bg-white"
@@ -773,7 +768,7 @@ const SpareBilling = ({ theme: t }) => {
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Spare Part</label>
-                                        <select 
+                                        <select
                                             value={selectedSpareId}
                                             onChange={(e) => setSelectedSpareId(e.target.value)}
                                             disabled={!selectedCategory || availableSpares.length === 0}
@@ -790,8 +785,8 @@ const SpareBilling = ({ theme: t }) => {
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                     <div>
                                         <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Quantity</label>
-                                        <input 
-                                            type="number" 
+                                        <input
+                                            type="number"
                                             min="1"
                                             value={selectedSpareQty}
                                             onChange={(e) => setSelectedSpareQty(e.target.value)}
@@ -800,8 +795,8 @@ const SpareBilling = ({ theme: t }) => {
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-blue-600 uppercase block mb-1.5">Selling Price (₹)</label>
-                                        <input 
-                                            type="number" 
+                                        <input
+                                            type="number"
                                             min="0"
                                             value={selectedSparePrice}
                                             onChange={(e) => setSelectedSparePrice(e.target.value)}
@@ -811,8 +806,8 @@ const SpareBilling = ({ theme: t }) => {
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-emerald-600 uppercase block mb-1.5">Discount (%)</label>
-                                        <input 
-                                            type="number" 
+                                        <input
+                                            type="number"
                                             min="0" max="100"
                                             value={selectedSpareDiscount}
                                             onChange={(e) => setSelectedSpareDiscount(e.target.value)}
@@ -821,42 +816,29 @@ const SpareBilling = ({ theme: t }) => {
                                         />
                                     </div>
                                     <div>
-                                        <button 
+                                        <button
                                             onClick={handleAddItemToBill}
                                             disabled={!selectedSpareId}
                                             className="w-full h-11 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                                         >
-                                            <Plus size={14}/> Add Item
+                                            <Plus size={14} /> Add Item
                                         </button>
                                     </div>
                                 </div>
-                                {availableSpares.find(s => s._id === selectedSpareId)?.isTangible && (
-                                    <div className="flex items-center">
-                                        <label className="flex items-center gap-2 cursor-pointer bg-red-50 px-4 py-2 rounded-xl border border-red-100">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={selectedSpareMarkStockOut}
-                                                onChange={(e) => setSelectedSpareMarkStockOut(e.target.checked)}
-                                                className="w-4 h-4 accent-red-600 rounded"
-                                            />
-                                            <span className="text-sm font-bold text-red-700">Mark as completely Stock Out</span>
-                                        </label>
-                                    </div>
-                                )}
                             </div>
                         </div>
 
                         {/* Add Labour Card */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 overflow-visible">
                             <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-5 flex items-center gap-2">
-                                <Plus size={16}/> Add Labour to Bill
+                                <Plus size={16} /> Add Labour to Bill
                             </h3>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Amount (₹)</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         min="0"
                                         value={labourAmount}
                                         onChange={(e) => setLabourAmount(e.target.value)}
@@ -866,8 +848,8 @@ const SpareBilling = ({ theme: t }) => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Remark</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         value={labourRemark}
                                         onChange={(e) => setLabourRemark(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white transition-all"
@@ -876,8 +858,8 @@ const SpareBilling = ({ theme: t }) => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-emerald-600 uppercase block mb-1.5">Discount (%)</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         min="0" max="100"
                                         value={labourDiscount}
                                         onChange={(e) => setLabourDiscount(e.target.value)}
@@ -886,7 +868,7 @@ const SpareBilling = ({ theme: t }) => {
                                     />
                                 </div>
                                 <div>
-                                    <button 
+                                    <button
                                         onClick={() => {
                                             if (!labourAmount || isNaN(labourAmount) || labourAmount <= 0) return alert("Please enter a valid amount");
                                             if (!labourRemark.trim()) return alert("Please enter a remark");
@@ -898,7 +880,7 @@ const SpareBilling = ({ theme: t }) => {
                                         disabled={!labourAmount || !labourRemark.trim()}
                                         className="w-full h-11 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest text-[10px] hover:bg-slate-800 transition-colors shadow-lg disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                                     >
-                                        <Plus size={14}/> Add Labour
+                                        <Plus size={14} /> Add Labour
                                     </button>
                                 </div>
                             </div>
@@ -909,7 +891,7 @@ const SpareBilling = ({ theme: t }) => {
                     <div className="lg:col-span-1">
                         <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 p-6 sticky top-6">
                             <h3 className="text-lg font-black uppercase tracking-tight text-slate-800 mb-6 flex items-center gap-2">
-                                <IndianRupee className="text-emerald-500"/> Bill Summary
+                                <IndianRupee className="text-emerald-500" /> Bill Summary
                             </h3>
 
                             <div className="min-h-[150px] max-h-[300px] overflow-y-auto pr-2 mb-6 space-y-3">
@@ -929,13 +911,13 @@ const SpareBilling = ({ theme: t }) => {
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 ml-3">
                                                     <span className="text-sm font-mono font-black text-slate-800">
-                                                        ₹{((item.qty * item.sellingPrice) * (1 - (item.discount || 0)/100)).toLocaleString()}
+                                                        ₹{((item.qty * item.sellingPrice) * (1 - (item.discount || 0) / 100)).toLocaleString()}
                                                     </span>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleRemoveItemFromBill(idx)}
                                                         className="text-slate-300 hover:text-red-500 transition-colors"
                                                     >
-                                                        <X size={14}/>
+                                                        <X size={14} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -947,9 +929,9 @@ const SpareBilling = ({ theme: t }) => {
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2 ml-3">
                                                     <span className={`text-sm font-mono font-black ${(isFreeService && serviceNumber) ? 'text-emerald-500 line-through' : 'text-blue-800'}`}>
-                                                        ₹{(labour.amount * (1 - (labour.discount || 0)/100)).toLocaleString()}
+                                                        ₹{(labour.amount * (1 - (labour.discount || 0) / 100)).toLocaleString()}
                                                     </span>
-                                                    <button 
+                                                    <button
                                                         onClick={() => {
                                                             const newList = [...labourList];
                                                             newList.splice(idx, 1);
@@ -957,7 +939,7 @@ const SpareBilling = ({ theme: t }) => {
                                                         }}
                                                         className="text-blue-300 hover:text-red-500 transition-colors"
                                                     >
-                                                        <X size={14}/>
+                                                        <X size={14} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -966,15 +948,15 @@ const SpareBilling = ({ theme: t }) => {
                                 )}
                             </div>
 
-                                <div className="border-t border-slate-100 pt-5 space-y-4">
+                            <div className="border-t border-slate-100 pt-5 space-y-4">
                                 <div className="flex justify-between items-center pt-2">
                                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Total Amount</span>
                                     <span className="text-2xl font-black text-emerald-600 font-mono tracking-tight">₹{totalBillAmount.toLocaleString()}</span>
                                 </div>
-                                
+
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1.5">Payment Method</label>
-                                    <select 
+                                    <select
                                         value={paymentMethod}
                                         onChange={(e) => setPaymentMethod(e.target.value)}
                                         className="w-full h-11 px-4 rounded-xl border border-slate-200 font-bold text-slate-800 outline-none focus:border-emerald-500 bg-white"
@@ -986,25 +968,25 @@ const SpareBilling = ({ theme: t }) => {
                                     </select>
                                 </div>
 
-                                <button 
+                                <button
                                     onClick={handleCreateBill}
                                     disabled={submitting || billItems.length === 0 || !customerName.trim()}
                                     className={`w-full h-14 mt-2 ${t.primary} text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-xl shadow-blue-500/30 hover:opacity-90 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none flex items-center justify-center gap-2`}
                                 >
-                                    {submitting ? 'Processing...' : <><CheckCircle2 size={18}/> Generate Bill</>}
+                                    {submitting ? 'Processing...' : <><CheckCircle2 size={18} /> Generate Bill</>}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-        {viewPdfDataUrl && (
+            {viewPdfDataUrl && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl animate-in zoom-in-95">
                         <div className="flex justify-between items-center p-4 border-b border-slate-100">
                             <h3 className="text-lg font-black uppercase tracking-tight text-slate-800">Bill Preview</h3>
                             <button onClick={() => setViewPdfDataUrl(null)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
-                                <X size={20}/>
+                                <X size={20} />
                             </button>
                         </div>
                         <div className="flex-1 p-0 rounded-b-2xl overflow-hidden">
