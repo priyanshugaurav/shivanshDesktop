@@ -532,15 +532,31 @@ app.get('/api/dashboard/non-monetary-analytics', verifyToken, async (req, res) =
       customerName: c.customer?.personal?.firstName + ' ' + (c.customer?.personal?.lastName || ''),
     }));
 
+    const salesByModel = {};
+    challans.forEach(c => {
+      const model = c.details?.model || 'Unknown';
+      salesByModel[model] = (salesByModel[model] || 0) + 1;
+    });
+
     // 2. Spares Volume
     const spareQuery = dateFilter.$gte ? { createdAt: dateFilter } : {};
     const spareBills = await SpareBill.find(spareQuery).lean();
     let totalSparesSold = 0;
+    const sparesItemCount = {};
+    
     spareBills.forEach(bill => {
       bill.items?.forEach(item => {
         totalSparesSold += (item.qty || 0);
+        if (item.name) {
+           sparesItemCount[item.name] = (sparesItemCount[item.name] || 0) + (item.qty || 0);
+        }
       });
     });
+
+    const topSpares = Object.keys(sparesItemCount)
+      .map(name => ({ name, qty: sparesItemCount[name] }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
 
     // 3. Current Stock
     const availableStock = await VehicleStock.find({ status: 'Available' }).populate('modelId').lean();
@@ -550,23 +566,31 @@ app.get('/api/dashboard/non-monetary-analytics', verifyToken, async (req, res) =
       stockByModel[modelName] = (stockByModel[modelName] || 0) + 1;
     });
 
+    // Determine low stock alert (model with least available stock > 0, or just the first one)
+    const lowStockAlertModel = availableStock.length > 0 ? availableStock[0] : null;
+
     // 4. Staff Active
     const activeStaff = await Employee.countDocuments({ 'professional.status': 'Active' });
+    const totalStaff = await Employee.countDocuments();
 
     res.json({
       sales: {
         total: challans.length,
-        trend: salesTrend
+        trend: salesTrend,
+        byModel: Object.keys(salesByModel).map(key => ({ name: key, count: salesByModel[key] }))
       },
       spares: {
-        totalSold: totalSparesSold
+        totalSold: totalSparesSold,
+        topItems: topSpares
       },
       stock: {
         total: availableStock.length,
-        byModel: Object.keys(stockByModel).map(key => ({ name: key, count: stockByModel[key] }))
+        byModel: Object.keys(stockByModel).map(key => ({ name: key, count: stockByModel[key] })),
+        alert: lowStockAlertModel ? `${lowStockAlertModel.modelId?.name} (${lowStockAlertModel.color})` : 'Optimal'
       },
       staff: {
-        active: activeStaff
+        active: activeStaff,
+        total: totalStaff
       }
     });
   } catch (error) {
