@@ -94,11 +94,11 @@ const TechnicalStockDashboard = ({ theme: t }) => {
 
     // --- HANDLERS ---
 
-    const handleSelectModel = (model) => {
+    function handleSelectModel(model) {
         setSelectedModel(model);
         setViewMode('dashboard');
         fetchStocks(model._id);
-    };
+    }
 
     const handleAddModel = async () => {
         if (!newModel.name.trim()) return;

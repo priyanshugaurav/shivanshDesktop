@@ -10,29 +10,18 @@ import {
 } from 'recharts';
 import { useEnquiries } from '../hooks/useEnquiries';
 
-const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
-};
-
-const Home = ({ theme: t, setActiveTab }) => {
+const Home = ({ theme: t }) => {
     // --- STATE ---
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     
     const [timeFilter, setTimeFilter] = useState('This Month'); // This Month, Last Month, All Time, Custom
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
-    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-    const { data: leadsData, loading: leadsLoading } = useEnquiries('Enquiries');
+    const { data: leadsData } = useEnquiries('Enquiries');
     
     // --- DATE RANGE LOGIC ---
-    const getDateRange = () => {
+    const getDateRange = React.useCallback(() => {
         const now = new Date();
         let start, end;
 
@@ -51,7 +40,7 @@ const Home = ({ theme: t, setActiveTab }) => {
             return { startDate: null, endDate: null };
         }
         return { startDate: start.toISOString(), endDate: end.toISOString() };
-    };
+    }, [timeFilter, customRange]);
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -77,7 +66,7 @@ const Home = ({ theme: t, setActiveTab }) => {
             }
         };
         fetchStats();
-    }, [timeFilter, customRange]);
+    }, [getDateRange]);
 
     // --- LEAD PROCESSING (Filtered locally by date) ---
     const leadStats = useMemo(() => {
@@ -110,7 +99,7 @@ const Home = ({ theme: t, setActiveTab }) => {
         });
 
         return { total: list.length, hot, warm, cold, list };
-    }, [leadsData, timeFilter, customRange]);
+    }, [leadsData, getDateRange]);
 
     // --- THEME UTILS ---
     const getThemeGradient = () => {
@@ -161,7 +150,7 @@ const Home = ({ theme: t, setActiveTab }) => {
                         {['This Month', 'Last Month', 'All Time', 'Custom'].map(f => (
                             <button 
                                 key={f}
-                                onClick={() => { setTimeFilter(f); if(f !== 'Custom') setIsDatePickerOpen(false); }}
+                                onClick={() => setTimeFilter(f)}
                                 className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${timeFilter === f ? `bg-slate-900 text-white shadow-md` : 'text-slate-500 hover:bg-slate-100'}`}
                             >
                                 {f}
