@@ -235,11 +235,6 @@ const Home = ({ theme: t }) => {
                             <Briefcase size={10} className="text-slate-400"/>
                             <span>Executive Summary</span>
                         </div>
-                    </div>
-                    {/* Add a professional filler paragraph */}
-                    <p className="mt-3 text-[13px] text-slate-500 leading-relaxed max-w-2xl hidden md:block">
-                        This comprehensive dashboard provides an operational overview of showroom performance, inventory flow, and lead progression. All metrics displayed are strictly non-monetary, focusing on volume, operational efficiency, and active pipeline health.
-                    </p>
                 </div>
 
                 {/* Floating Control Dock */}
