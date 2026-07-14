@@ -1054,6 +1054,8 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
                             <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">DSE</label>
                             <select value={formData.dse.name} onChange={e => handleDeepChange('dse', 'name', e.target.value)} className={`w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-transparent focus:ring-1 ${theme.ring}`}>
                                 <option value="">SELECT DSE</option>
+                                <option value="SHOWROOM">SHOWROOM</option>
+                                <option value="OTHER">OTHER</option>
                                 {dseList.map((name, i) => (
                                     <option key={i} value={name}>{name}</option>
                                 ))}
