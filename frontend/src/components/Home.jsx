@@ -235,6 +235,7 @@ const Home = ({ theme: t }) => {
                             <Briefcase size={10} className="text-slate-400"/>
                             <span>Executive Summary</span>
                         </div>
+                    </div>
                 </div>
 
                 {/* Floating Control Dock */}
