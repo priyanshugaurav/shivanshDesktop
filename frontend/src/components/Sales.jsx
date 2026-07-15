@@ -788,7 +788,7 @@ const AgreementForm = ({ theme, onBack, customer, onSuccess, initialData }) => {
             const costPrice = insurance + registration + exShowroom;
             const sellingPrice = safe(formData.model.sellingPrice);
             onRoadPrice = sellingPrice.toFixed(2);
-            netProfit = (sellingPrice - costPrice - brokerAmt - otherAmt).toFixed(2);
+            netProfit = (sellingPrice - costPrice - bankFee - brokerAmt - otherAmt).toFixed(2);
         } else {
             onRoadPrice = (exShowroom + insurance + rto + permit - discount).toFixed(2);
             netProfit = (downPayment - safe(magadhMargin) - safe(dtoTotal) + dealCommission).toFixed(2);
