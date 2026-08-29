@@ -20,7 +20,7 @@ import AddVehicle from './AddVehicle';
 import Expense from './Expense';
 import Home from './Home'; // Imported Home Component
 import Invoice from './Invoice';
-import Ledger from './Ledger';
+import Ledger from './LegacyLedger';
 import SpareStock from './SpareStock';
 import SpareBilling from './SpareBilling';
 import SpareAnalytics from './SpareAnalytics';

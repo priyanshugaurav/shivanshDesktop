@@ -273,14 +273,27 @@ const ExpenseSchema = new mongoose.Schema({
 });
 const Expense = mongoose.models.Expense || mongoose.model('Expense', ExpenseSchema);
 
+// 6.7.1 PARTY SCHEMA (For Ledger)
+const PartySchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  phone: { type: String },
+  type: { type: String, enum: ['Customer', 'Supplier', 'Financier', 'Expense'], required: true },
+  openingBalance: { type: Number, default: 0 },
+  balanceType: { type: String, enum: ['Receivable', 'Payable'], default: 'Receivable' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Party = mongoose.models.Party || mongoose.model('Party', PartySchema);
+
 // 6.8 LEDGER SCHEMA (Business Transactions)
 const LedgerSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   description: { type: String, required: true },
   category: { type: String, default: 'General' },
   type: { type: String, enum: ['Credit', 'Debit'], required: true },
+  transactionPurpose: { type: String, enum: ['Payment Received', 'Payment Made', 'Credit Invoice', 'Credit Bill'], required: true },
   amount: { type: Number, required: true },
-  balance: { type: Number, required: true }, // Running balance
+  balance: { type: Number, required: true }, // Running balance of the entire ledger book
+  partyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Party' },
   partyName: { type: String, default: '' },
   paymentMethod: { type: String, default: 'Cash' },
   createdAt: { type: Date, default: Date.now }
@@ -1768,10 +1781,30 @@ app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
   }
 });
 
+// --- PARTY ROUTES ---
+app.get('/api/parties', verifyToken, async (req, res) => {
+  try {
+    const parties = await Party.find().sort({ name: 1 });
+    res.json(parties);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/parties', verifyToken, async (req, res) => {
+  try {
+    const party = new Party(req.body);
+    await party.save();
+    res.status(201).json(party);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // --- LEDGER ROUTES ---
 app.get('/api/ledger', verifyToken, async (req, res) => {
   try {
-    const ledger = await Ledger.find().sort({ date: -1, createdAt: -1 });
+    const ledger = await Ledger.find().populate('partyId').sort({ date: -1, createdAt: -1 });
     res.json(ledger);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1780,7 +1813,7 @@ app.get('/api/ledger', verifyToken, async (req, res) => {
 
 app.post('/api/ledger', verifyToken, async (req, res) => {
   try {
-    const { date, description, category, type, amount, partyName, paymentMethod } = req.body;
+    const { date, description, category, type, transactionPurpose, amount, partyId, partyName, paymentMethod } = req.body;
     
     // Calculate running balance based on the most recent entry
     const lastEntry = await Ledger.findOne().sort({ date: -1, createdAt: -1 });
@@ -1795,12 +1828,16 @@ app.post('/api/ledger', verifyToken, async (req, res) => {
       description,
       category: category || 'General',
       type,
+      transactionPurpose,
       amount: Number(amount),
       balance: newBalance,
+      partyId: partyId || null,
       partyName: partyName || '',
       paymentMethod: paymentMethod || 'Cash'
     });
-    res.status(201).json(entry);
+    
+    const populatedEntry = await Ledger.findById(entry._id).populate('partyId');
+    res.status(201).json(populatedEntry);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
