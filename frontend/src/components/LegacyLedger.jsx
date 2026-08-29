@@ -90,9 +90,14 @@ const LedgerBook = ({ theme }) => {
         setFormData({...formData, partyId: savedParty._id});
         setIsAddingParty(false);
         setNewPartyData({ name: '', phone: '', type: 'Customer', openingBalance: 0, balanceType: 'Receivable' });
+        alert('Party created successfully!');
+      } else {
+        const error = await res.json();
+        alert(`Error: ${error.message || 'Failed to save party'}`);
       }
     } catch (error) {
       console.error('Failed to save party', error);
+      alert('Failed to connect to server. Please try again.');
     }
   };
 
@@ -631,16 +636,6 @@ const LedgerBook = ({ theme }) => {
                       <option>Financier</option>
                       <option>Expense</option>
                     </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 items-end">
-                     <div>
-                       <label className="text-[10px] font-bold text-slate-500 uppercase">Opening Balance</label>
-                       <input type="number" placeholder="0" value={newPartyData.openingBalance} onChange={e=>setNewPartyData({...newPartyData, openingBalance: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
-                     </div>
-                     <select value={newPartyData.balanceType} onChange={e=>setNewPartyData({...newPartyData, balanceType: e.target.value})} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white">
-                       <option value="Receivable">To Receive (+)</option>
-                       <option value="Payable">To Pay (-)</option>
-                     </select>
                   </div>
                   <button type="button" onClick={handleAddParty} className="w-full py-2 bg-slate-800 text-white rounded-lg text-sm font-bold shadow-md hover:bg-slate-700 flex items-center justify-center gap-2"><CheckCircle2 size={16}/> Save Party</button>
                 </div>
