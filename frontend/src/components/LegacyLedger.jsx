@@ -547,8 +547,8 @@ const LedgerBook = ({ theme }) => {
                 <th className="px-6 py-4 font-bold">Description</th>
                 <th className="px-6 py-4 font-bold">Purpose</th>
                 <th className="px-6 py-4 font-bold">Method</th>
-                <th className="px-6 py-4 font-bold text-right text-emerald-500">Credit (In)</th>
-                <th className="px-6 py-4 font-bold text-right text-rose-500">Debit (Out)</th>
+                <th className="px-6 py-4 font-bold text-right text-emerald-500">Debit (Dr)</th>
+                <th className="px-6 py-4 font-bold text-right text-rose-500">Credit (Cr)</th>
                 <th className="px-6 py-4 font-bold text-right">Balance</th>
                 <th className="px-6 py-4 font-bold text-center">Action</th>
               </tr>
@@ -574,7 +574,7 @@ const LedgerBook = ({ theme }) => {
                     {activeView === 'all' && <td className="px-6 py-4 text-slate-800 font-semibold">{tx.partyId?.name || tx.partyName || '-'}</td>}
                     <td className="px-6 py-4 text-slate-700 font-medium">{tx.description}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${tx.type === 'Credit' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide ${tx.type === 'Debit' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                         {tx.transactionPurpose || tx.category}
                       </span>
                     </td>
@@ -584,10 +584,10 @@ const LedgerBook = ({ theme }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-emerald-600">
-                      {tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
+                      {tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-rose-600">
-                      {tx.type === 'Debit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
+                      {tx.type === 'Credit' ? tx.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '-'}
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-slate-800">
                       {(activeView === 'partyDetail' && tx.partyRunningBalance !== undefined)
