@@ -6,7 +6,7 @@ import * as XLSX from 'xlsx';
 
 const API_URL = (import.meta.env.VITE_API_URL || '') + '/api';
 
-const LegacyLedger = ({ theme }) => {
+const Ledger = ({ theme }) => {
   const [transactions, setTransactions] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -701,5 +701,4 @@ const LegacyLedger = ({ theme }) => {
   );
 };
 
-export default LegacyLedger;
-
+export default Ledger;

@@ -287,47 +287,6 @@ const LedgerSchema = new mongoose.Schema({
 });
 const Ledger = mongoose.models.Ledger || mongoose.model('Ledger', LedgerSchema);
 
-// ==========================================
-// JOURNAL ENTRY SCHEMAS (Double-Entry Accounting)
-// Completely separate from the Ledger above.
-// ==========================================
-
-const JournalLineSchema = new mongoose.Schema({
-  accountName: { type: String, required: true }, // e.g., "Cash", "Bank", "Vehicle Sales"
-  accountType: { type: String, enum: ['Asset', 'Liability', 'Income', 'Expense', 'Equity'], required: true },
-  debit: { type: Number, default: 0 },
-  credit: { type: Number, default: 0 },
-  narration: { type: String, default: '' }
-});
-
-const JournalEntrySchema = new mongoose.Schema({
-  voucherNo:       { type: String, required: true, unique: true },
-  date:            { type: Date, required: true },
-  transactionType: { 
-    type: String, 
-    enum: [
-      'Vehicle Purchase', 'Vehicle Sale', 'Customer Advance', 'Customer Payment',
-      'Customer Refund', 'Supplier Payment', 'Spare Parts Purchase', 'Spare Parts Sale',
-      'Accessories', 'Service/Repair', 'Salary', 'Rent', 'Electricity', 'Fuel',
-      'Transportation', 'Insurance', 'RTO/Registration', 'Loan Received',
-      'Loan Repayment', 'Interest', 'Bank Charges', 'Tax/GST Payment',
-      'Other Income', 'Other Expense', 'Journal Adjustment', 'Contra'
-    ],
-    required: true
-  },
-  description:     { type: String, required: true },
-  partyName:       { type: String, default: '' },
-  paymentMode:     { type: String, enum: ['Cash', 'Bank', 'UPI', 'Cheque', 'Bank Transfer', 'N/A'], default: 'Cash' },
-  referenceNo:     { type: String, default: '' },
-  lines:           [JournalLineSchema],
-  totalAmount:     { type: Number, required: true }, // sum of all debit lines (= sum of credit lines)
-  status:          { type: String, enum: ['Posted', 'Cancelled'], default: 'Posted' },
-  cancelledReason: { type: String, default: '' },
-  createdAt:       { type: Date, default: Date.now },
-  updatedAt:       { type: Date, default: Date.now }
-});
-const JournalEntry = mongoose.models.JournalEntry || mongoose.model('JournalEntry', JournalEntrySchema);
-
 // 7. NEW INVENTORY SCHEMAS (Two-Tier)
 
 // Tier 1: Vehicle Model (Catalog Name)
@@ -1804,73 +1763,6 @@ app.delete('/api/expenses/:id', verifyToken, async (req, res) => {
     
     await Expense.findByIdAndDelete(req.params.id);
     res.json({ message: 'Expense deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ==========================================
-// JOURNAL ENTRY ROUTES (Double-Entry)
-// Completely separate from Legacy Ledger
-// ==========================================
-
-app.get('/api/journal', verifyToken, async (req, res) => {
-  try {
-    const entries = await JournalEntry.find().sort({ date: -1, createdAt: -1 });
-    res.json(entries);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/journal', verifyToken, async (req, res) => {
-  try {
-    const { date, transactionType, description, partyName, paymentMode, referenceNo, lines, totalAmount } = req.body;
-    
-    // Auto-generate voucher number (e.g. JV-001)
-    const count = await JournalEntry.countDocuments();
-    const voucherNo = `JV-${(count + 1).toString().padStart(4, '0')}`;
-    
-    // Validate that debits == credits
-    let totalDebit = 0;
-    let totalCredit = 0;
-    lines.forEach(line => {
-      totalDebit += Number(line.debit || 0);
-      totalCredit += Number(line.credit || 0);
-    });
-    
-    if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      return res.status(400).json({ error: 'Unbalanced Journal Entry: Debits must equal Credits.' });
-    }
-
-    const entry = await JournalEntry.create({
-      voucherNo,
-      date,
-      transactionType,
-      description,
-      partyName,
-      paymentMode,
-      referenceNo,
-      lines,
-      totalAmount: totalDebit
-    });
-    
-    res.status(201).json(entry);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.put('/api/journal/:id/cancel', verifyToken, async (req, res) => {
-  try {
-    const { cancelledReason } = req.body;
-    const entry = await JournalEntry.findByIdAndUpdate(
-      req.params.id, 
-      { status: 'Cancelled', cancelledReason, updatedAt: new Date() },
-      { new: true }
-    );
-    if (!entry) return res.status(404).json({ message: 'Journal Entry not found' });
-    res.json(entry);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
