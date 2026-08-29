@@ -44,7 +44,8 @@ const TechnicalStockDashboard = ({ theme: t }) => {
         chargerCompany: '',
         color: 'Red',
         purchaseRate: '',
-        hsn: ''
+        hsn: '',
+        status: 'Available'
     };
     const [stockForm, setStockForm] = useState(initialStockForm);
     const [submitting, setSubmitting] = useState(false);
@@ -478,6 +479,28 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Technical Identifiers</label>
                                         
                                         <div className="space-y-1">
+                                            <span className="text-[10px] font-bold text-slate-500">UNIT STATUS</span>
+                                            <div className="flex gap-2">
+                                                {['Available', 'Sold', 'Booked'].map(s => (
+                                                    <button 
+                                                        key={s}
+                                                        type="button"
+                                                        onClick={() => setStockForm({...stockForm, status: s})}
+                                                        className={`flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all duration-200 ${
+                                                            stockForm.status === s 
+                                                            ? s === 'Available' ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-100'
+                                                              : s === 'Sold' ? 'bg-slate-800 text-white border-slate-800 shadow-sm shadow-slate-100'
+                                                              : 'bg-red-500 text-white border-red-500 shadow-sm shadow-red-100'
+                                                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                                        }`}
+                                                    >
+                                                        {s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Hash size={12}/> CHASSIS NO.</span>
                                             <input 
                                                 type="text" 
@@ -676,7 +699,8 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                                     chargerCompany: item.chargerCompany || '',
                                                                     color: item.color,
                                                                     purchaseRate: item.purchaseRate,
-                                                                    hsn: item.hsn
+                                                                    hsn: item.hsn,
+                                                                    status: item.status || 'Available'
                                                                 });
                                                                 setViewMode('add_stock');
                                                             }}

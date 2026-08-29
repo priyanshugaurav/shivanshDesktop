@@ -1021,13 +1021,14 @@ app.post('/api/stocks', verifyToken, async (req, res) => {
       exShowroom, insurance, rto, permit 
     } = req.body;
 
-    const existingItem = await VehicleStock.findOne({ chassisNo });
+    const cleanChassisNo = chassisNo ? chassisNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : '';
+    const existingItem = await VehicleStock.findOne({ chassisNo: cleanChassisNo });
     if (existingItem) {
       return res.status(400).json({ message: 'Vehicle with this Chassis Number already exists' });
     }
 
     const newStock = await VehicleStock.create({
-      modelId, variant, voltage, chassisNo, motorNo, batteryNo, color,
+      modelId, variant, voltage, chassisNo: cleanChassisNo, motorNo, batteryNo, color,
       purchaseRate: Number(purchaseRate) || 0,
       hsn,
       exShowroom: Number(exShowroom) || 0,
@@ -1056,6 +1057,9 @@ app.delete('/api/stocks/:id', verifyToken, async (req, res) => {
 // 6. Update Stock (e.g., mark as sold)
 app.put('/api/stocks/:id', verifyToken, async (req, res) => {
     try {
+      if (req.body.chassisNo) {
+        req.body.chassisNo = req.body.chassisNo.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      }
       const updatedStock = await VehicleStock.findByIdAndUpdate(
         req.params.id,
         { $set: req.body },
