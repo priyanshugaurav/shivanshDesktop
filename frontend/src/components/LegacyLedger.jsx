@@ -650,8 +650,8 @@ const LedgerBook = ({ theme }) => {
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type</label>
                     <div className="flex bg-slate-100 p-1 rounded-lg">
-                      <button type="button" onClick={() => setFormData({...formData, type: 'Credit'})} className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${formData.type === 'Credit' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`}>Credit (+)</button>
-                      <button type="button" onClick={() => setFormData({...formData, type: 'Debit'})} className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${formData.type === 'Debit' ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>Debit (-)</button>
+                      <button type="button" onClick={() => setFormData({...formData, type: 'Debit'})} className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${formData.type === 'Debit' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500'}`}>Debit (+)</button>
+                      <button type="button" onClick={() => setFormData({...formData, type: 'Credit'})} className={`flex-1 py-1 text-xs font-bold rounded-md transition-all ${formData.type === 'Credit' ? 'bg-white shadow-sm text-rose-600' : 'text-slate-500'}`}>Credit (-)</button>
                     </div>
                   </div>
                 </div>
