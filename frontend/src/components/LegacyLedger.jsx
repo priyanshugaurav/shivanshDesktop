@@ -193,21 +193,17 @@ const LedgerBook = ({ theme }) => {
         const pid = tx.partyId._id || tx.partyId;
         
         let effect = 0;
-        if (tx.transactionPurpose === 'Payment Received') effect = -tx.amount;
-        else if (tx.transactionPurpose === 'Credit Invoice') effect = tx.amount;
-        else if (tx.transactionPurpose === 'Payment Made') effect = tx.amount;
-        else if (tx.transactionPurpose === 'Credit Bill') effect = -tx.amount;
+        // For supplier (payable): Credit Bill = we owe MORE (-), Payment Made = we owe LESS (+)
+        // For customer (receivable): Credit Invoice = they owe MORE (+), Payment Received = they owe LESS (-)
+        if (tx.transactionPurpose === 'Credit Bill') effect = -tx.amount;    // supplier balance goes negative
+        else if (tx.transactionPurpose === 'Payment Made') effect = tx.amount; // reduces supplier payable
+        else if (tx.transactionPurpose === 'Credit Invoice') effect = tx.amount; // customer owes more
+        else if (tx.transactionPurpose === 'Payment Received') effect = -tx.amount; // customer owes less
         
         pMap[pid].balance += effect;
         pMap[pid].txCount += 1;
-        
-        // Attach running balance for this specific party to the transaction object
         tx.partyRunningBalance = pMap[pid].balance;
       }
-      
-      // Also attach global running cash balance for 'all' view
-      // Wait, global balance is in tx.balance from the DB, but let's trust it or recompute it.
-      // The DB provides tx.balance, so we can just use that.
     });
 
     return Object.values(pMap).sort((a, b) => b.balance - a.balance);
@@ -250,20 +246,24 @@ const LedgerBook = ({ theme }) => {
   // DYNAMIC FORM OPTIONS
   // -------------------------------------------------------------
   
-  const purposeOptions = formData.type === 'Credit' 
-    ? ['Payment Received', 'Credit Invoice'] 
-    : ['Payment Made', 'Credit Bill'];
+  // All purposes available under both Credit and Debit
+  // Credit (+) = money GOING OUT of business (NEFT, payments to supplier)
+  // Debit  (-) = goods/vehicles RECEIVED on credit (liability created)
+  const creditPurposes = ['Payment Made', 'Payment Received'];
+  const debitPurposes  = ['Credit Bill', 'Credit Invoice'];
+  const purposeOptions = formData.type === 'Credit' ? creditPurposes : debitPurposes;
     
   const categoryOptions = formData.type === 'Credit'
-    ? ['Vehicle Sale', 'Parts Sale', 'Loan Disbursement', 'Capital In', 'Other Income']
-    : ['Inventory Purchase', 'Rent', 'Supplier Pay', 'Salary', 'Utility Bill', 'Other Expense'];
+    ? ['Supplier Pay', 'Other Payment', 'Capital Out', 'Loan Repayment']
+    : ['Inventory Purchase', 'Vehicle Purchase', 'Capital In', 'Loan Disbursement', 'Other Purchase'];
 
   // Keep form consistent when type changes
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
       transactionPurpose: prev.type === 'Credit' ? 'Payment Received' : 'Payment Made',
-      category: prev.type === 'Credit' ? 'Vehicle Sale' : 'Other Expense'
+      transactionPurpose: prev.type === 'Credit' ? 'Payment Made' : 'Credit Bill',
+      category: prev.type === 'Credit' ? 'Supplier Pay' : 'Vehicle Purchase'
     }));
   }, [formData.type]);
 
