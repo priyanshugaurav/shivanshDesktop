@@ -43,6 +43,8 @@ const TechnicalStockDashboard = ({ theme: t }) => {
         chargerNo: '',
         chargerCompany: '',
         color: 'Red',
+        rate: '',
+        freight: '',
         purchaseRate: '',
         hsn: '',
         status: 'Available'
@@ -450,16 +452,62 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Financials (Unit Specific)</label>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
-                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Purchase Rate (₹)</span>
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Rate (₹)</span>
                                                 <input 
                                                     type="number" 
-                                                    value={stockForm.purchaseRate}
-                                                    onChange={(e) => setStockForm({...stockForm, purchaseRate: e.target.value})}
+                                                    value={stockForm.rate}
+                                                    onChange={(e) => {
+                                                        const rate = Number(e.target.value);
+                                                        const freight = Number(stockForm.freight) || 0;
+                                                        const purchaseRate = (rate + freight) * 1.05;
+                                                        setStockForm({...stockForm, rate: e.target.value, purchaseRate: purchaseRate.toFixed(2)});
+                                                    }}
                                                     className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
                                                     placeholder="0.00"
                                                 />
                                             </div>
                                             <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Freight (₹)</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={stockForm.freight}
+                                                    onChange={(e) => {
+                                                        const freight = Number(e.target.value);
+                                                        const rate = Number(stockForm.rate) || 0;
+                                                        const purchaseRate = (rate + freight) * 1.05;
+                                                        setStockForm({...stockForm, freight: e.target.value, purchaseRate: purchaseRate.toFixed(2)});
+                                                    }}
+                                                    className="w-full h-10 px-3 rounded border border-slate-200 font-bold text-slate-700 focus:border-blue-500 focus:outline-none"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 mt-4">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">CGST (2.5%)</span>
+                                                <div className="w-full h-10 px-3 rounded border border-slate-200 bg-slate-50 font-bold text-slate-500 flex items-center">
+                                                    {(((Number(stockForm.rate) || 0) + (Number(stockForm.freight) || 0)) * 0.025).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">SGST (2.5%)</span>
+                                                <div className="w-full h-10 px-3 rounded border border-slate-200 bg-slate-50 font-bold text-slate-500 flex items-center">
+                                                    {(((Number(stockForm.rate) || 0) + (Number(stockForm.freight) || 0)) * 0.025).toFixed(2)}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase">Purchase Rate</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={stockForm.purchaseRate}
+                                                    readOnly
+                                                    className="w-full h-10 px-3 rounded border border-slate-200 bg-slate-50 font-bold text-slate-700 focus:outline-none"
+                                                    placeholder="0.00"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-4 mt-4">
+                                            <div className="space-y-1 w-1/2 pr-2">
                                                 <span className="text-[10px] font-bold text-slate-500 uppercase">HSN Code</span>
                                                 <input 
                                                     type="text" 
@@ -698,6 +746,8 @@ const TechnicalStockDashboard = ({ theme: t }) => {
                                                                     chargerNo: item.chargerNo || '',
                                                                     chargerCompany: item.chargerCompany || '',
                                                                     color: item.color,
+                                                                    rate: item.rate || '',
+                                                                    freight: item.freight || '',
                                                                     purchaseRate: item.purchaseRate,
                                                                     hsn: item.hsn,
                                                                     status: item.status || 'Available'

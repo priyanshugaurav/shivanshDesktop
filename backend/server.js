@@ -328,6 +328,8 @@ const VehicleStockSchema = new mongoose.Schema({
   chargerCompany: { type: String, trim: true, default: '' },
 
   // Financials
+  rate: { type: Number, default: 0 },
+  freight: { type: Number, default: 0 },
   purchaseRate: { type: Number, default: 0 },
   hsn: { type: String, default: '' },
   
@@ -1030,7 +1032,7 @@ app.post('/api/stocks', verifyToken, async (req, res) => {
     const { 
       modelId, variant, voltage, 
       chassisNo, motorNo, batteryNo, color, 
-      purchaseRate, hsn,
+      rate, freight, purchaseRate, hsn,
       exShowroom, insurance, rto, permit 
     } = req.body;
 
@@ -1042,6 +1044,8 @@ app.post('/api/stocks', verifyToken, async (req, res) => {
 
     const newStock = await VehicleStock.create({
       modelId, variant, voltage, chassisNo: cleanChassisNo, motorNo, batteryNo, color,
+      rate: Number(rate) || 0,
+      freight: Number(freight) || 0,
       purchaseRate: Number(purchaseRate) || 0,
       hsn,
       exShowroom: Number(exShowroom) || 0,
