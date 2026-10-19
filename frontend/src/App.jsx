@@ -7,9 +7,19 @@ import Login from './components/Login';
 import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
 import AdminPage from './components/AdminPage';
+import SitePaused from './components/SitePaused';
+
+// Set to true to activate the paused / maintenance mode screen
+const IS_SITE_PAUSED = true;
 
 const App = () => {
   const location = useLocation();
+
+  // If site is paused, show Site Paused screen (can bypass with ?preview=true if needed)
+  if (IS_SITE_PAUSED && !location.search.includes('preview=true')) {
+    return <SitePaused />;
+  }
+
   // Hide global navbar on login/signup pages for a cleaner look
   const hideNavbar = ['/login', '/signup'].includes(location.pathname);
 

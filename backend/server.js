@@ -30,6 +30,18 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// --- Maintenance / Paused Mode ---
+const IS_SITE_PAUSED = true;
+app.use((req, res, next) => {
+  if (IS_SITE_PAUSED && req.query.preview !== 'true') {
+    return res.status(402).json({
+      error: 'Site Paused',
+      message: 'Free limit exceeded'
+    });
+  }
+  next();
+});
+
 // --- Serverless-safe MongoDB connection (cached) ---
 let cachedConnection = null;
 mongoose.set('bufferCommands', false); // Fail fast instead of hanging on Vercel
