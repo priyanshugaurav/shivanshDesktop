@@ -42,24 +42,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Serverless-safe MongoDB connection (cached) ---
-let cachedConnection = null;
+// --- Serverless-safe MongoDB connection (cached promise) ---
+let cachedPromise = null;
 mongoose.set('bufferCommands', false); // Fail fast instead of hanging on Vercel
 const connectDB = async () => {
-  if (cachedConnection && mongoose.connection.readyState === 1) {
-    return cachedConnection;
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
-  // Trim to remove any trailing whitespace/newlines from env var
-  const uri = (process.env.MONGO_URI || '').trim();
-  console.log('Attempting MongoDB connection... URI length:', uri.length);
-  try {
-    cachedConnection = await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
-    console.log('✅ MongoDB connected');
-    return cachedConnection;
-  } catch (err) {
-    console.error('❌ MongoDB Connection Error Details:', err.message);
-    throw err;
+  if (!cachedPromise) {
+    const uri = (process.env.MONGO_URI || '').trim();
+    console.log('Attempting MongoDB connection... URI length:', uri.length);
+    cachedPromise = mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 })
+      .then((conn) => {
+        console.log('✅ MongoDB connected');
+        return conn;
+      })
+      .catch((err) => {
+        cachedPromise = null;
+        console.error('❌ MongoDB Connection Error Details:', err.message);
+        throw err;
+      });
   }
+  return cachedPromise;
 };
 // Do not blindly swallow the error. If it fails, API routes will handle it.
 connectDB().catch(err => console.error('Initial DB Connect failed:', err.message));
