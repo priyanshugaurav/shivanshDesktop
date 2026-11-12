@@ -31,7 +31,7 @@ app.use(cors({
 app.use(express.json());
 
 // --- Maintenance / Paused Mode ---
-const IS_SITE_PAUSED = true;
+const IS_SITE_PAUSED = false;
 app.use((req, res, next) => {
   if (IS_SITE_PAUSED && req.query.preview !== 'true') {
     return res.status(402).json({

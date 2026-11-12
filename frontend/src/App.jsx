@@ -10,7 +10,7 @@ import AdminPage from './components/AdminPage';
 import SitePaused from './components/SitePaused';
 
 // Set to true to activate the paused / maintenance mode screen
-const IS_SITE_PAUSED = true;
+const IS_SITE_PAUSED = false;
 
 const App = () => {
   const location = useLocation();
