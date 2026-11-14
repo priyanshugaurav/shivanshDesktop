@@ -652,7 +652,7 @@ app.get('/api/dashboard/non-monetary-analytics', verifyToken, async (req, res) =
 
 app.get('/api/customers', verifyToken, async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const customers = await Customer.find().lean();
     const challans = await Challan.find({ customer: { $in: customers.map(c => c._id) } }, 'customer details.challanDate').lean();
     
     const enrichedCustomers = customers.map(c => {
@@ -661,6 +661,16 @@ app.get('/api/customers', verifyToken, async (req, res) => {
         ...c,
         challanDate: challan?.details?.challanDate || null
       };
+    });
+
+    // Sort by challanDate descending (latest date on top); fallback to createdAt descending
+    enrichedCustomers.sort((a, b) => {
+      const timeA = a.challanDate ? new Date(a.challanDate).getTime() : 0;
+      const timeB = b.challanDate ? new Date(b.challanDate).getTime() : 0;
+      if (timeB !== timeA) return timeB - timeA;
+      const createA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const createB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return createB - createA;
     });
     
     res.json(enrichedCustomers);
@@ -671,7 +681,7 @@ app.get('/api/customers', verifyToken, async (req, res) => {
 
 app.get('/api/customers/export', verifyToken, async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const customers = await Customer.find().lean();
     const challans = await Challan.find().lean();
     const agreements = await Agreement.find().lean();
 
@@ -685,6 +695,16 @@ app.get('/api/customers/export', verifyToken, async (req, res) => {
         challan: challan || null,
         agreement: agreement || null
       };
+    });
+
+    // Sort by challanDate descending (latest date on top)
+    result.sort((a, b) => {
+      const timeA = a.challan?.details?.challanDate ? new Date(a.challan.details.challanDate).getTime() : 0;
+      const timeB = b.challan?.details?.challanDate ? new Date(b.challan.details.challanDate).getTime() : 0;
+      if (timeB !== timeA) return timeB - timeA;
+      const createA = a.customer?.createdAt ? new Date(a.customer.createdAt).getTime() : 0;
+      const createB = b.customer?.createdAt ? new Date(b.customer.createdAt).getTime() : 0;
+      return createB - createA;
     });
 
     res.json(result);

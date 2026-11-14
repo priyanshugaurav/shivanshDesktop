@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   // Stats & Layout
   ArrowUpRight, ArrowDownRight, DollarSign, ShoppingBag, CreditCard, 
   Activity, MoreHorizontal, Search, Calendar, 
   Plus, ChevronDown, Check, FileText, Download,
-  ArrowLeft, Save, User, Home, Hash, Truck, ChevronRight, CheckCircle2,
+  ArrowLeft, Save, User, Home, Hash, Truck, ChevronLeft, ChevronRight, CheckCircle2,
   
   // Modal & Form Icons
   X, Trash2, Eye, Clock, MapPin, AlertCircle, Lock, ArrowDown, ShieldCheck, Mail, Edit2, Zap, Tag, Layers, ClipboardCheck, Fingerprint,
@@ -1719,6 +1719,9 @@ const Sales = ({ theme }) => {
   const [activeCustomerForAction, setActiveCustomerForAction] = useState(null);
   const [editingChallanData, setEditingChallanData] = useState(null);
   const [editingAgreementData, setEditingAgreementData] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   const fetchCustomers = async () => {
     try {
@@ -1907,6 +1910,38 @@ const Sales = ({ theme }) => {
       return <AgreementForm theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onSuccess={handleRefresh} initialData={editingAgreementData} />;
   }
 
+  const filteredAndSortedCustomers = useMemo(() => {
+    let result = [...customers];
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter(c => 
+        (c.name && c.name.toLowerCase().includes(q)) ||
+        (c.id && c.id.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.toLowerCase().includes(q)) ||
+        (c.address && c.address.toLowerCase().includes(q))
+      );
+    }
+
+    result.sort((a, b) => {
+      const timeA = a.challanDate ? new Date(a.challanDate).getTime() : 0;
+      const timeB = b.challanDate ? new Date(b.challanDate).getTime() : 0;
+      if (timeB !== timeA) return timeB - timeA;
+      const createA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const createB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return createB - createA;
+    });
+
+    return result;
+  }, [customers, searchTerm]);
+
+  const totalItems = filteredAndSortedCustomers.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (validCurrentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const paginatedCustomers = filteredAndSortedCustomers.slice(startIndex, endIndex);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-20 relative">
       {selectedCustomer && <ActionModal customer={selectedCustomer} theme={theme} onClose={() => setSelectedCustomer(null)} onNavigate={(action) => handleWorkflowAction(action, selectedCustomer)} />}
@@ -1930,22 +1965,35 @@ const Sales = ({ theme }) => {
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
         <div className="px-6 py-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-           <div className="flex items-center gap-4 flex-1"><h2 className="text-base font-bold text-slate-800">Records</h2><div className="h-5 w-px bg-gray-200 hidden md:block"></div><div className="relative w-full max-w-xs group"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400 group-focus-within:text-slate-600 transition-colors" /><input type="text" placeholder="Search..." className={`w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent rounded-lg text-xs font-medium placeholder-gray-400 focus:bg-white focus:border-gray-200 focus:shadow-sm outline-none transition-all ${theme.ring}`} /></div></div>
+           <div className="flex items-center gap-4 flex-1">
+             <h2 className="text-base font-bold text-slate-800">Records</h2>
+             <div className="h-5 w-px bg-gray-200 hidden md:block"></div>
+             <div className="relative w-full max-w-xs group">
+               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400 group-focus-within:text-slate-600 transition-colors" />
+               <input 
+                 type="text" 
+                 placeholder="Search by name, ID, phone..." 
+                 value={searchTerm}
+                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                 className={`w-full pl-9 pr-3 py-2 bg-gray-50 border border-transparent rounded-lg text-xs font-medium placeholder-gray-400 focus:bg-white focus:border-gray-200 focus:shadow-sm outline-none transition-all ${theme.ring}`} 
+               />
+             </div>
+           </div>
            <button onClick={() => setView('add')} className={`flex items-center gap-2 px-4 py-2 text-xs font-bold text-white rounded-lg shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all ${theme.primary}`}><Plus className="h-3.5 w-3.5" /><span>Add Record</span></button>
         </div>
 
-        <div className="w-full">
+        <div className="w-full overflow-x-auto">
            <table className="w-full text-left border-collapse">
              <thead><tr className="border-b border-gray-200 bg-gray-50/60"><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider w-24">ID</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Customer</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Details</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Challan Date</th><th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Pipeline</th><th className="px-6 py-4 w-12"></th></tr></thead>
              <tbody className="divide-y divide-gray-100">
                  {loading ? (
                    <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs font-bold">Loading records...</td></tr>
-                 ) : customers.length === 0 ? (
-                   <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs font-bold">No records found. Add a new customer.</td></tr>
-                 ) : customers.map((c, i) => (
-                   <tr key={i} onClick={() => setSelectedCustomer(c)} className="group hover:bg-gray-50/50 transition-colors relative cursor-pointer">
+                 ) : filteredAndSortedCustomers.length === 0 ? (
+                   <tr><td colSpan="6" className="p-8 text-center text-slate-400 text-xs font-bold">{searchTerm ? 'No matching records found.' : 'No records found. Add a new customer.'}</td></tr>
+                 ) : paginatedCustomers.map((c, i) => (
+                   <tr key={c.id || i} onClick={() => setSelectedCustomer(c)} className="group hover:bg-gray-50/50 transition-colors relative cursor-pointer">
                       <td className="px-6 py-5 align-middle"><span className="text-xs font-bold text-slate-600 font-mono group-hover:text-slate-900 transition-colors">{c.id}</span></td>
-                      <td className="px-6 py-5 align-middle"><div className="flex items-center gap-3"><div className={`h-10 w-10 rounded-full ${theme.light || 'bg-slate-100'} flex items-center justify-center text-slate-500`}><User className="h-5 w-5" /></div><div><p className="text-xs font-bold text-slate-800">{c.name}</p><p className="text-[10px] font-medium text-gray-400">{c.email}</p></div></div></td>
+                      <td className="px-6 py-5 align-middle"><div className="flex items-center gap-3"><div className={`h-10 w-10 rounded-full ${theme.light || 'bg-slate-100'} flex items-center justify-center text-slate-500`}><User className="h-5 w-5" /></div><div><p className="text-xs font-bold text-slate-800">{c.name}</p><p className="text-[10px] font-medium text-gray-400">{c.email || c.phone}</p></div></div></td>
                       <td className="px-6 py-5 align-middle"><div className="flex flex-col"><span className="text-xs font-medium text-slate-700 truncate max-w-[150px]">{c.address}</span></div></td>
                       <td className="px-6 py-5 align-middle"><span className="text-[11px] font-medium text-slate-600">{c.challanDate ? new Date(c.challanDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</span></td>
                       <td className="px-6 py-5 align-middle"><div className="flex justify-center"><StatusPipeline status={c.pipeline} theme={theme} /></div></td>
@@ -1956,12 +2004,47 @@ const Sales = ({ theme }) => {
            </table>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30 rounded-b-xl">
-            <span className="text-[10px] font-medium text-gray-500">Showing 1-10 of {customers.length}</span>
-            <div className="flex items-center gap-1 overflow-x-auto max-w-[200px] scrollbar-hide pb-1">
-               <button className="min-w-[32px] h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all shrink-0 bg-white border border-gray-200 shadow-sm text-slate-900">1</button>
-               <button className="min-w-[32px] h-8 flex items-center justify-center rounded-lg text-gray-400 hover:bg-white hover:text-slate-700 shrink-0"><ChevronRight className="h-3 w-3" /></button>
-            </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-gray-50/30 rounded-b-xl">
+            <span className="text-[11px] font-medium text-gray-500">
+              Showing {totalItems === 0 ? 0 : startIndex + 1}–{endIndex} of {totalItems} records
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={validCurrentPage === 1}
+                  className="px-2.5 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all bg-white border border-gray-200 text-slate-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Prev
+                </button>
+                
+                <div className="flex items-center gap-1 overflow-x-auto max-w-[280px] scrollbar-hide py-1">
+                  {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(pageNum => (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`min-w-[32px] h-8 px-2 flex items-center justify-center rounded-lg text-xs font-bold transition-all shrink-0 ${
+                        validCurrentPage === pageNum
+                          ? `${theme.primary} text-white shadow-sm`
+                          : 'bg-white border border-gray-200 text-slate-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={validCurrentPage === totalPages}
+                  className="px-2.5 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all bg-white border border-gray-200 text-slate-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  title="Next Page"
+                >
+                  Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </button>
+              </div>
+            )}
         </div>
       </div>
     </div>
