@@ -1892,24 +1892,6 @@ const Sales = ({ theme }) => {
     }
   };
 
-  if (view === 'add') return <AddRecord theme={theme} onBack={() => setView('list')} onSuccess={handleRefresh} />;
-  
-  if (view === 'view-challan') {
-      return <ViewChallan theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onEdit={handleEditChallan} />;
-  }
-
-  if (view === 'add-challan') {
-      return <ChallanForm theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onSuccess={handleRefresh} initialData={editingChallanData} />;
-  }
-
-  if (view === 'view-agreement') {
-      return <ViewAgreement theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onEdit={handleEditAgreement} />;
-  }
-
-  if (view === 'add-agreement') {
-      return <AgreementForm theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onSuccess={handleRefresh} initialData={editingAgreementData} />;
-  }
-
   const filteredAndSortedCustomers = useMemo(() => {
     let result = [...customers];
 
@@ -1941,6 +1923,24 @@ const Sales = ({ theme }) => {
   const startIndex = (validCurrentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const paginatedCustomers = filteredAndSortedCustomers.slice(startIndex, endIndex);
+
+  if (view === 'add') return <AddRecord theme={theme} onBack={() => setView('list')} onSuccess={handleRefresh} />;
+  
+  if (view === 'view-challan') {
+      return <ViewChallan theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onEdit={handleEditChallan} />;
+  }
+
+  if (view === 'add-challan') {
+      return <ChallanForm theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onSuccess={handleRefresh} initialData={editingChallanData} />;
+  }
+
+  if (view === 'view-agreement') {
+      return <ViewAgreement theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onEdit={handleEditAgreement} />;
+  }
+
+  if (view === 'add-agreement') {
+      return <AgreementForm theme={theme} customer={activeCustomerForAction} onBack={() => { setView('list'); setActiveCustomerForAction(null); }} onSuccess={handleRefresh} initialData={editingAgreementData} />;
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-20 relative">
